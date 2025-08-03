@@ -15,7 +15,7 @@ import (
 func MainPage(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
-		validators.HeaderPlain(&res, req)
+		validators.TextPlain(&res, req)
 
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
@@ -41,19 +41,21 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case http.MethodGet:
-		validators.HeaderPlain(&res, req)
-
 		long, ok := (*repository.MapShorts())[req.RequestURI[1:]]
 		if !ok {
 			log.Printf(`Unable to find long URL for short: %s: status: %d`, req.RequestURI[1:], http.StatusBadRequest)
 			http.Error(res, `Unable to find long URL for short`, http.StatusBadRequest)
 		}
 
+		log.Println("Map of short links: ", repository.MapShorts())
+		log.Printf("long URL: $s", long)
 		res.Header().Add("Location", long)
-		res.WriteHeader(http.StatusTemporaryRedirect)
 
+		res.WriteHeader(http.StatusTemporaryRedirect)
+		log.Println("Full header: ", res.Header())
 		return
 	}
+
 	log.Printf(`Method not implemented: %s, status: %d`, req.Method, http.StatusNotImplemented)
 	http.Error(res, `BadRequest`, http.StatusBadRequest)
 }

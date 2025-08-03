@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// HeaderPlain check if Content-Type is `text/plain`.
-func HeaderPlain(res *http.ResponseWriter, req *http.Request) {
+// TextPlain check if Content-Type is `text/plain`.
+func TextPlain(res *http.ResponseWriter, req *http.Request) {
 	if value, ok := req.Header[`Content-Type`]; !ok {
 		http.Error(*res, `Empty content type`, http.StatusBadRequest)
 	} else if !slices.ContainsFunc(value, func(s string) bool { return strings.Contains(s, `text/plain`) }) {
