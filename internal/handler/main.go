@@ -14,9 +14,6 @@ import (
 func MainPage(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
-		// if err := req.ParseForm(); err != nil {
-		// 	http.Error(res, `Cannot Parse Form`, http.StatusBadRequest)
-		// }
 		if value, ok := req.Header[`Content-Type`]; ok {
 			if !slices.ContainsFunc(value, func(s string) bool { return strings.Contains(s, `text/plain`) }) {
 				http.Error(res, `BadRequest`, http.StatusBadRequest)
@@ -25,7 +22,6 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				http.Error(res, `BadRequest`, http.StatusBadRequest)
 			}
-			// nolint
 			defer req.Body.Close()
 			short, err := service.ShortURL(body)
 			if err != nil {
