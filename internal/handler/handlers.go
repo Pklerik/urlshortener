@@ -54,6 +54,6 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 
 		return
 	}
-	log.Printf(`Method not implemented: %s, status: %s`, req.Method, http.StatusNotImplemented)
+	log.Printf(`Method not implemented: %s, status: %d`, req.Method, http.StatusNotImplemented)
 	http.Error(res, `BadRequest`, http.StatusBadRequest)
 }

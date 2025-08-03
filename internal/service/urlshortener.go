@@ -10,12 +10,11 @@ import (
 
 // ShortURL grands short url from db.
 func ShortURL(long []byte) (string, error) {
-
-	// to do - check equalFolds for the long and short links
 	var short string
 	for shortURL, longURL := range *repository.MapShorts() {
 		if string(long) == longURL {
 			log.Printf("Short url: %s get for long: %s", short, string(long))
+
 			return shortURL, nil
 		}
 	}
@@ -28,6 +27,8 @@ func ShortURL(long []byte) (string, error) {
 			break
 		}
 	}
+
 	log.Printf("Short url: %s sets for long: %s", short, string(long))
+
 	return short, nil
 }
