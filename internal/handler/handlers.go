@@ -29,7 +29,7 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 
 		res.WriteHeader(http.StatusCreated)
 
-		_, err = res.Write([]byte(req.Host + `/` + short))
+		_, err = res.Write([]byte(`http://` + req.Host + `/` + short))
 		if err != nil {
 			http.Error(res, `Unexpected exception: `, http.StatusInternalServerError)
 		}
