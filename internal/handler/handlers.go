@@ -48,11 +48,11 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 		}
 
 		log.Println("Map of short links: ", repository.MapShorts())
-		log.Printf("long URL: $s", long)
 		res.Header().Add("Location", long)
 
 		res.WriteHeader(http.StatusTemporaryRedirect)
 		log.Println("Full header: ", res.Header())
+
 		return
 	}
 
