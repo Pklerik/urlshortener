@@ -1,3 +1,4 @@
+// Package service provide all business logic for applications.
 package service
 
 import (
@@ -6,18 +7,23 @@ import (
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
 
-func ShortURL(long []byte) (short [10]byte, err error) {
-	for shortUrl, longUrl := range repository.MapShortener {
-		if string(long) == string(longUrl) {
-			return shortUrl, nil
+// ShortURL grands short url from db.
+func ShortURL(long []byte) (string, error) {
+	var short string
+	for shortURL, longURL := range *repository.MapShorts() {
+		if string(long) == longURL {
+			return shortURL, nil
 		}
 	}
+
 	for {
-		short = [10]byte([]byte(rand.Text()[:10]))
-		if _, ok := repository.MapShortener[short]; !ok {
-			repository.MapShortener[short] = long
+		short = rand.Text()[:10]
+		if _, ok := (*repository.MapShorts())[short]; !ok {
+			(*repository.MapShorts())[short] = string(long)
+
 			break
 		}
 	}
-	return
+
+	return short, nil
 }
