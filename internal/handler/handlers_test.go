@@ -38,10 +38,10 @@ func TestMainPage(t *testing.T) {
 	request.Header.Add(`Content-Type`, "text/plain")
 	w := httptest.NewRecorder()
 	MainPage(w, request)
-	res_post := w.Result()
+	resPost := w.Result()
 
-	defer res_post.Body.Close()
-	resBody, _ := io.ReadAll(res_post.Body)
+	defer resPost.Body.Close()
+	resBody, _ := io.ReadAll(resPost.Body)
 
 	tests := []struct {
 		name string
