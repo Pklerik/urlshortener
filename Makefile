@@ -2,7 +2,7 @@ upd_test:
 	git fetch template && git checkout template/main .github
 
 test:
-	go test -coverpkg=./... -cover -coferprofile cpver.tmp.out ./...
+	go test -coverpkg=./... -cover -coferprofile cover.tmp.out ./...
 	echo "-----------------------------------------------------------------------------------"
 	cat cover.tmp.out | grep -v "main.go" > cover.out
 	go tool cover -func cover.out

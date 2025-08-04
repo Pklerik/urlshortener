@@ -15,14 +15,15 @@ import (
 func MainPage(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPost:
-		validators.TextPlain(&res, req)
+		validators.TextPlain(res, req)
+
+		defer req.Body.Close()
 
 		body, err := io.ReadAll(req.Body)
 		if err != nil {
 			log.Printf(`Unable to read body: status: %d`, http.StatusBadRequest)
 			http.Error(res, `Unable to read body`, http.StatusBadRequest)
 		}
-		defer req.Body.Close()
 
 		short, err := service.ShortURL(body)
 		if err != nil {
@@ -41,9 +42,9 @@ func MainPage(res http.ResponseWriter, req *http.Request) {
 		return
 
 	case http.MethodGet:
-		long, ok := (*repository.MapShorts())[req.RequestURI[1:]]
+		long, ok := (*repository.MapShorts())[req.URL.Path[1:]]
 		if !ok {
-			log.Printf(`Unable to find long URL for short: %s: status: %d`, req.RequestURI[1:], http.StatusBadRequest)
+			log.Printf(`Unable to find long URL for short: %s: status: %d`, req.URL.Path[1:], http.StatusBadRequest)
 			http.Error(res, `Unable to find long URL for short`, http.StatusBadRequest)
 		}
 
