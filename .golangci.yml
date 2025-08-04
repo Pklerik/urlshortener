@@ -8,13 +8,66 @@ linters:
   # - `none`: disables all linters by default.
   # - `fast`: enables only linters considered as "fast" (`golangci-lint help linters --json | jq '[ .[] | select(.fast==true) ] | map(.name)'`).
   # Default: standard
-  default: all
+  default: none
   disable:
     - errcheck
     - wsl
   enable:
+    - bodyclose
+    - depguard
+    - dogsled
+    - dupword
+    - err113
+    - errcheck
+    - errorlint
+    - forbidigo
+    - funlen
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - gomodguard
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - nolintlint
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+    - wrapcheck
     - wsl_v5
   settings:
+    depguard:
+      rules:
+        base:
+          deny:
+          - pkg: syscall
+            desc: not allowed package syscall
+          - pkg: encoding/json
+            desc: please use "github.com/goccy/go-json"
+          - pkg: reflect
+            desc: not allowed package reflect
+    dogsled:
+      max-blank-identifiers: 2
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      disable-default-exclusions: true
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+        - (net/http.ResponseWriter).Close
+        - (net/http.ResponseReader).Close
+      verbose: false
+    gosec:
+      excludes:
+        - G114
     wsl_v5:
       allow-first-in-block: true
       allow-whole-block: false
@@ -70,4 +123,7 @@ run:
   # Default: 0 (automatically set to match Linux container CPU quota and
   # fall back to the number of logical CPUs in the machine)
   concurrency: 4
-
+output:
+  formats:
+    text:
+      path: stdout

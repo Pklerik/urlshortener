@@ -15,6 +15,7 @@ func StartServer() {
 	mux.HandleFunc(`/`, handler.MainPage)
 
 	log.Println("Starting server")
+
 	if err := http.ListenAndServe(`:8080`, mux); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("HTTP server error: %v", err)
 	}
