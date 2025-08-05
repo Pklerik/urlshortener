@@ -8,17 +8,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Pklerik/urlshortener/internal/repository"
+	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func handler() http.Handler {
+func handler() (http.Handler, *LinkHandler) {
+	linksRepo := repository.NewInMemoryLinksRepository()
+	linksService := service.NewLinksService(linksRepo)
+	linksHandler := NewLinkHandler(linksService)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", MainPage)
-	return mux
+	mux.HandleFunc(`/`, linksHandler.RegisterLinkHandler)
+	return mux, linksHandler
 }
 
-func TestMainPage(t *testing.T) {
+func TestRegisterLinkHandler(t *testing.T) {
 	type args struct {
 		method        string
 		contentTypes  []string
@@ -31,13 +36,14 @@ func TestMainPage(t *testing.T) {
 		Location string
 	}
 
-	srv := httptest.NewServer(handler())
+	mux, linksHandler := handler()
+	srv := httptest.NewServer(mux)
 	defer srv.Close()
 	testURL := "http://ya.ru"
 	request := httptest.NewRequest(http.MethodPost, srv.URL, strings.NewReader(testURL))
 	request.Header.Add(`Content-Type`, "text/plain")
 	w := httptest.NewRecorder()
-	MainPage(w, request)
+	linksHandler.RegisterLinkHandler(w, request)
 	resPost := w.Result()
 
 	defer resPost.Body.Close()
@@ -66,7 +72,7 @@ func TestMainPage(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			MainPage(w, request)
+			linksHandler.RegisterLinkHandler(w, request)
 			res := w.Result()
 
 			assert.Equal(t, tt.want.code, res.StatusCode)

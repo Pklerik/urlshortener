@@ -7,15 +7,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
+
+	//nolint
 	"syscall"
 
 	"github.com/Pklerik/urlshortener/internal/handler"
+	"github.com/Pklerik/urlshortener/internal/repository"
+	"github.com/Pklerik/urlshortener/internal/service"
 	"golang.org/x/sync/errgroup"
 )
 
 // StartServer starts server with base configuration.
 func StartServer() {
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -26,12 +30,17 @@ func StartServer() {
 		cancel()
 	}()
 
+	linksRepo := repository.NewInMemoryLinksRepository()
+	linksService := service.NewLinksService(linksRepo)
+	linksHandler := handler.NewLinkHandler(linksService)
 	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, handler.MainPage)
+	mux.HandleFunc(`/`, linksHandler.RegisterLinkHandler)
 
 	httpServer := &http.Server{
-		Addr:    ":8000",
-		Handler: mux,
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  10 * time.Minute,
+		WriteTimeout: 10 * time.Minute,
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -42,6 +51,7 @@ func StartServer() {
 	g.Go(func() error {
 		<-gCtx.Done()
 		log.Println("Stopped serving new connections.")
+
 		return httpServer.Shutdown(context.Background())
 	})
 
