@@ -4,11 +4,17 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
+)
+
+var (
+	//ErrEmptyLongURL - error for empty short url
+	ErrEmptyLongURL = errors.New("ShortURL is empty")
 )
 
 // LinkService - structure for service repository realization.
@@ -24,6 +30,9 @@ func NewLinksService(repo repository.LinksRepository) *LinkService {
 // RegisterLink - register the Link with provided longURL.
 func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
 	var shortURL string
+	if longURL == "" {
+		return model.LinkData{}, ErrEmptyLongURL
+	}
 
 	ld, err := ls.linksRepo.FindLong(ctx, longURL)
 	if err == nil {
