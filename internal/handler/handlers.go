@@ -21,7 +21,7 @@ func NewLinkHandler(userService *service.LinkService) *LinkHandler {
 	return &LinkHandler{linkService: userService}
 }
 
-// RegisterLinkHandler returns Handler for URLs registration.
+// GetRegisterLinkHandler returns Handler for URLs registration for GET method.
 func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Request) {
 	ld, err := lh.linkService.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
 	if err != nil {
@@ -35,6 +35,7 @@ func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Req
 	log.Printf("Full header: %v", w.Header())
 }
 
+// PostRegisterLinkHandler returns Handler for URLs registration for GET method.
 func (lh *LinkHandler) PostRegisterLinkHandler(w http.ResponseWriter, r *http.Request) {
 	err := validators.TextPlain(w, r)
 	if err != nil {

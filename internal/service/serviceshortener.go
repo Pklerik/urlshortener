@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	//ErrEmptyLongURL - error for empty short url
+	// ErrEmptyLongURL - error for empty short url.
 	ErrEmptyLongURL = errors.New("ShortURL is empty")
 )
 
@@ -30,6 +30,7 @@ func NewLinksService(repo repository.LinksRepository) *LinkService {
 // RegisterLink - register the Link with provided longURL.
 func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
 	var shortURL string
+
 	if longURL == "" {
 		return model.LinkData{}, ErrEmptyLongURL
 	}

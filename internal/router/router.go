@@ -22,5 +22,6 @@ func ConfigureRouter() http.Handler {
 		r.Get("/{shortURL}", linksHandler.GetRegisterLinkHandler)
 		r.Post("/", linksHandler.PostRegisterLinkHandler)
 	})
+
 	return r
 }

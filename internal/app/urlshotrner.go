@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	//nolint
 	"syscall"
 	"time"
 
