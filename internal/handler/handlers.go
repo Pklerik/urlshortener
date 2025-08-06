@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
@@ -60,7 +61,10 @@ func (lh *LinkHandler) PostRegisterLinkHandler(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusCreated)
 
-	_, err = w.Write([]byte(`http://` + lh.Args.AddressShortURL.Host + `/` + ld.ShortURL))
+	_, err = w.Write([]byte(lh.Args.AddressShortURL.Protocol + "://" +
+		lh.Args.AddressShortURL.Host + ":" +
+		strconv.Itoa(lh.Args.AddressShortURL.Port) +
+		`/` + ld.ShortURL))
 	if err != nil {
 		log.Printf(`Unexpected exception: status: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
