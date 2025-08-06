@@ -10,7 +10,7 @@ import (
 // StartupFalgs - app startup flags.
 type StartupFalgs struct {
 	ServerAddress   Address
-	AddressShortURL Address
+	AddressShortURL string
 	Timeout         Timeout
 }
 
@@ -23,18 +23,26 @@ type Address struct {
 
 // String provide string representation of Address.
 func (a *Address) String() string {
+	if a.Protocol == "" {
+		a.Protocol = "http"
+	}
+
+	if a.Host == "" {
+		a.Host = "localhost"
+	}
+
+	if a.Port == 0 {
+		a.Port = 8080
+	}
+
 	return fmt.Sprintf("%s://%s:%d", a.Protocol, a.Host, a.Port)
 }
 
 // Set parse Address from string.
 func (a *Address) Set(flagValue string) error {
-	a.Protocol = "http"
-	a.Host = "localhost"
-	a.Port = 8080
-
 	flagValueMod := flagValue
 	if strings.Contains(flagValue, "http") {
-		a.Protocol = strings.Split(flagValue, "/")[0]
+		a.Protocol = strings.Split(flagValue, ":")[0]
 	}
 
 	if len(strings.Split(flagValue, "://")) == 2 {
@@ -52,7 +60,18 @@ func (a *Address) Set(flagValue string) error {
 		return fmt.Errorf("can't set Address Port for %s: %w", flagValue, err)
 	}
 
+	if a.Protocol == "" {
+		a.Protocol = "http"
+	}
+
+	if a.Host == "" {
+		a.Host = "localhost"
+	}
+
 	a.Port = port
+	if a.Port == 0 {
+		a.Port = 8080
+	}
 
 	return nil
 }
@@ -83,6 +102,9 @@ func (t *Timeout) Set(flagValue string) error {
 	}
 
 	t.Seconds = float64(milliseconds)/1000 + float64(seconds) + (float64(minutes) * 60)
+	if t.Seconds == 0 {
+		t.Seconds = 600
+	}
 
 	return nil
 }

@@ -34,12 +34,10 @@ func TestRegisterLinkHandler(t *testing.T) {
 		Location string
 	}
 	testURL := "http://ya.ru"
-	redirectHost := "test_host"
+	redirectHost := "http://test_host:2345"
 
 	r := handler(&config.StartupFalgs{
-		AddressShortURL: config.Address{
-			Host: redirectHost,
-		},
+		AddressShortURL: redirectHost,
 	})
 	srv := httptest.NewServer(r)
 	defer srv.Close()

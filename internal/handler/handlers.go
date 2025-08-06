@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
@@ -26,6 +25,8 @@ func NewLinkHandler(userService *service.LinkService, args *config.StartupFalgs)
 
 // GetRegisterLinkHandler returns Handler for URLs registration for GET method.
 func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf(`Full request: %#v`, *r)
+
 	ld, err := lh.linkService.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
 	if err != nil {
 		log.Printf(`Unable to find long URL for short: %s: status: %d`, r.URL.Path[1:], http.StatusBadRequest)
@@ -35,7 +36,7 @@ func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Req
 	w.Header().Add("Location", ld.LongURL)
 
 	w.WriteHeader(http.StatusTemporaryRedirect)
-	log.Printf("Full header: %v", w.Header())
+	log.Printf(`Full Link: %s, for Short "%s"`, ld.LongURL, chi.URLParam(r, "shortURL"))
 }
 
 // PostRegisterLinkHandler returns Handler for URLs registration for GET method.
@@ -61,12 +62,13 @@ func (lh *LinkHandler) PostRegisterLinkHandler(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusCreated)
 
-	_, err = w.Write([]byte(lh.Args.AddressShortURL.Protocol + "://" +
-		lh.Args.AddressShortURL.Host + ":" +
-		strconv.Itoa(lh.Args.AddressShortURL.Port) +
-		`/` + ld.ShortURL))
+	redirectURL := lh.Args.AddressShortURL + "/" + ld.ShortURL
+
+	_, err = w.Write([]byte(redirectURL))
 	if err != nil {
 		log.Printf(`Unexpected exception: status: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
 	}
+
+	log.Printf(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, ld.LongURL)
 }
