@@ -3,9 +3,10 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/Pklerik/urlshortener/internal/model"
@@ -35,21 +36,22 @@ func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.
 		return model.LinkData{}, ErrEmptyLongURL
 	}
 
-	ld, err := ls.linksRepo.FindLong(ctx, longURL)
+	// ld, err := ls.linksRepo.FindLong(ctx, longURL)
+	// if err == nil {
+	// 	return ld, nil
+	// }
+	h := md5.New()
+	io.WriteString(h, longURL)
+	shortURL = fmt.Sprintf("%x", h.Sum(nil))[:8]
+
+	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
 	if err == nil {
+		if ld.LongURL != longURL {
+			return ld, errors.New("collision in hash func")
+		}
+		log.Printf("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
 		return ld, nil
 	}
-
-	for {
-		shortURL = rand.Text()[:10]
-
-		ld, err = ls.linksRepo.FindShort(ctx, shortURL)
-		if err != nil {
-			break
-		}
-	}
-
-	log.Printf("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
 
 	ld, err = ls.linksRepo.Create(ctx, model.LinkData{ShortURL: shortURL, LongURL: longURL})
 	if err != nil {

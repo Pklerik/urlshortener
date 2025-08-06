@@ -11,5 +11,4 @@ import (
 type LinksRepository interface {
 	Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
-	FindLong(ctx context.Context, long string) (model.LinkData, error)
 }

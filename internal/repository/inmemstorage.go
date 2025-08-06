@@ -19,7 +19,6 @@ var (
 // InMemoryLinksRepository - simple in memory storage.
 type InMemoryLinksRepository struct {
 	Shorts map[string]*model.LinkData
-	Longs  map[string]*model.LinkData
 	mu     sync.RWMutex
 }
 
@@ -28,17 +27,15 @@ type InMemoryLinksRepository struct {
 func NewInMemoryLinksRepository() *InMemoryLinksRepository {
 	return &InMemoryLinksRepository{
 		Shorts: make(map[string]*model.LinkData, config.MapSize),
-		Longs:  make(map[string]*model.LinkData, config.MapSize),
 	}
 }
 
-// Create - writes linkData pointer to internal InMemoryLinksRepository maps (Shorts, Longs).
+// Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
 func (r *InMemoryLinksRepository) Create(_ context.Context, linkData model.LinkData) (model.LinkData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.Shorts[linkData.ShortURL] = &linkData
-	r.Longs[linkData.LongURL] = &linkData
 
 	return linkData, nil
 }
@@ -50,20 +47,6 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 	defer r.mu.RUnlock()
 
 	linkData, ok := r.Shorts[short]
-	if !ok {
-		return model.LinkData{}, ErrNotFoundLink
-	}
-
-	return *linkData, nil
-}
-
-// FindLong - provide model.LinkData and error
-// If longURL is absent returns ErrNotFoundLink.
-func (r *InMemoryLinksRepository) FindLong(_ context.Context, long string) (model.LinkData, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	linkData, ok := r.Longs[long]
 	if !ok {
 		return model.LinkData{}, ErrNotFoundLink
 	}

@@ -7,17 +7,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 
 	//nolint
 	"syscall"
 	"time"
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/router"
 	"golang.org/x/sync/errgroup"
 )
 
-// StartServer - starts server app function.
-func StartServer() {
+// StartApp - starts server app function.
+func StartApp(parsedArgs *config.StartupFalgs) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -28,11 +30,13 @@ func StartServer() {
 		cancel()
 	}()
 
+	log.Printf("Setup server with args: $#v", *parsedArgs)
+	argPort := ":" + strconv.Itoa(parsedArgs.ServerAddress.Port)
 	httpServer := &http.Server{
-		Addr:         ":8080",
+		Addr:         argPort,
 		Handler:      router.ConfigureRouter(),
-		ReadTimeout:  10 * time.Minute,
-		WriteTimeout: 10 * time.Minute,
+		ReadTimeout:  time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
+		WriteTimeout: time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
