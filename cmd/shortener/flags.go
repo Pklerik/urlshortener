@@ -15,7 +15,7 @@ func parseFlags() *config.StartupFalgs {
 		},
 		AddressShortURL: config.Address{
 			Protocol: "http",
-			Host:     "",
+			Host:     "localhost",
 			Port:     8080,
 		},
 		Timeout: config.Timeout{
