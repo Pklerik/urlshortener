@@ -30,13 +30,13 @@ func StartApp(parsedArgs *config.StartupFalgs) {
 		cancel()
 	}()
 
-	log.Printf("Setup server with args: $#v", *parsedArgs)
 	argPort := ":" + strconv.Itoa(parsedArgs.ServerAddress.Port)
+	log.Printf("Setup server with args: port: %s", argPort)
 	httpServer := &http.Server{
 		Addr:         argPort,
 		Handler:      router.ConfigureRouter(parsedArgs),
-		ReadTimeout:  time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
-		WriteTimeout: time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
+		ReadTimeout:  time.Duration(parsedArgs.Timeout.Seconds * float64(time.Second)),
+		WriteTimeout: time.Duration(parsedArgs.Timeout.Seconds * float64(time.Second)),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)

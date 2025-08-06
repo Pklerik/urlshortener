@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	//nolint
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 var (
 	// ErrEmptyLongURL - error for empty short url.
 	ErrEmptyLongURL = errors.New("ShortURL is empty")
+	// ErrCollision - sets error if shortURL existed for different long.
+	ErrCollision = errors.New("collision for url in db")
 )
 
 // LinkService - structure for service repository realization.
@@ -32,24 +35,24 @@ func NewLinksService(repo repository.LinksRepository) *LinkService {
 func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
 	var shortURL string
 
-	// if longURL == "" {
-	// 	return model.LinkData{}, ErrEmptyLongURL
-	// }
-
-	// ld, err := ls.linksRepo.FindLong(ctx, longURL)
-	// if err == nil {
-	// 	return ld, nil
-	// }
+	//nolint
 	h := md5.New()
-	io.WriteString(h, longURL)
+
+	_, err := io.WriteString(h, longURL)
+	if err != nil {
+		return model.LinkData{}, fmt.Errorf("RegisterLink longURL hash writing: %w", err)
+	}
+
 	shortURL = fmt.Sprintf("%x", h.Sum(nil))[:8]
 
 	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
 	if err == nil {
 		if ld.LongURL != longURL {
-			return ld, errors.New("collision in hash func")
+			return ld, ErrCollision
 		}
+
 		log.Printf("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
+
 		return ld, nil
 	}
 

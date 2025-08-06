@@ -26,5 +26,6 @@ func parseFlags() *config.StartupFalgs {
 	flag.Var(&parsedArgs.AddressShortURL, "b", "protocol, address and port for shortened urls")
 	flag.Var(&parsedArgs.Timeout, "timeout", "Custom timeout. Example: --timeout 1m2s3ms sets timeout to 62.003 seconds. Default: 10m")
 	flag.Parse()
+
 	return parsedArgs
 }
