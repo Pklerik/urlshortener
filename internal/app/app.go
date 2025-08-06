@@ -34,7 +34,7 @@ func StartApp(parsedArgs *config.StartupFalgs) {
 	argPort := ":" + strconv.Itoa(parsedArgs.ServerAddress.Port)
 	httpServer := &http.Server{
 		Addr:         argPort,
-		Handler:      router.ConfigureRouter(),
+		Handler:      router.ConfigureRouter(parsedArgs),
 		ReadTimeout:  time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
 		WriteTimeout: time.Duration(parsedArgs.Timeout.Seconds * int(time.Second)),
 	}

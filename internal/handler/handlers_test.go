@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
@@ -14,10 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func handler() http.Handler {
+func handler(parsedArgs *config.StartupFalgs) http.Handler {
 	linksRepo := repository.NewInMemoryLinksRepository()
 	linksService := service.NewLinksService(linksRepo)
-	linksHandler := NewLinkHandler(linksService)
+	linksHandler := NewLinkHandler(linksService, parsedArgs)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", linksHandler.GetRegisterLinkHandler)
@@ -33,8 +34,13 @@ func TestRegisterLinkHandler(t *testing.T) {
 		Location string
 	}
 	testURL := "http://ya.ru"
+	redirectHost := "test_host"
 
-	r := handler()
+	r := handler(&config.StartupFalgs{
+		AddressShortURL: config.Address{
+			Host: redirectHost,
+		},
+	})
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 	client := resty.New()
@@ -56,12 +62,13 @@ func TestRegisterLinkHandler(t *testing.T) {
 		body          *string
 		additionalURL string
 		testError     string
+		redirectHost  string
 		want          want
 	}{
-		{name: "Post Created", method: http.MethodPost, contentType: []string{"text/plain"}, body: &testURL, want: want{code: http.StatusCreated, response: srv.URL}},
-		{name: "Wrong content", method: http.MethodPost, contentType: []string{"application/json"}, body: &testURL, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
-		{name: "Wrong Redirect", method: http.MethodGet, additionalURL: "/WERTADSD", want: want{code: http.StatusBadRequest, response: "Unable to find long URL for short\n"}},
-		{name: "Get Redirect", method: http.MethodGet, additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled", want: want{code: http.StatusTemporaryRedirect, Location: testURL, response: ""}},
+		{name: "Post Created", method: http.MethodPost, redirectHost: redirectHost, contentType: []string{"text/plain"}, body: &testURL, want: want{code: http.StatusCreated, response: redirectHost}},
+		{name: "Wrong content", method: http.MethodPost, redirectHost: redirectHost, contentType: []string{"application/json"}, body: &testURL, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
+		{name: "Wrong Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/WERTADSD", want: want{code: http.StatusBadRequest, response: "Unable to find long URL for short\n"}},
+		{name: "Get Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled", want: want{code: http.StatusTemporaryRedirect, Location: testURL, response: ""}},
 	}
 
 	for _, tt := range tests {

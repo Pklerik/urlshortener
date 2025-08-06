@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
@@ -14,11 +15,12 @@ import (
 // LinkHandler - wrapper for service handling.
 type LinkHandler struct {
 	linkService *service.LinkService
+	Args        *config.StartupFalgs
 }
 
 // NewLinkHandler returns instance of LinkHandler.
-func NewLinkHandler(userService *service.LinkService) *LinkHandler {
-	return &LinkHandler{linkService: userService}
+func NewLinkHandler(userService *service.LinkService, args *config.StartupFalgs) *LinkHandler {
+	return &LinkHandler{linkService: userService, Args: args}
 }
 
 // GetRegisterLinkHandler returns Handler for URLs registration for GET method.
@@ -58,7 +60,7 @@ func (lh *LinkHandler) PostRegisterLinkHandler(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusCreated)
 
-	_, err = w.Write([]byte(`http://` + r.Host + `/` + ld.ShortURL))
+	_, err = w.Write([]byte(`http://` + lh.Args.AddressShortURL.Host + `/` + ld.ShortURL))
 	if err != nil {
 		log.Printf(`Unexpected exception: status: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)

@@ -32,9 +32,9 @@ func NewLinksService(repo repository.LinksRepository) *LinkService {
 func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
 	var shortURL string
 
-	if longURL == "" {
-		return model.LinkData{}, ErrEmptyLongURL
-	}
+	// if longURL == "" {
+	// 	return model.LinkData{}, ErrEmptyLongURL
+	// }
 
 	// ld, err := ls.linksRepo.FindLong(ctx, longURL)
 	// if err == nil {

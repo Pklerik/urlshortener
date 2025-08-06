@@ -6,6 +6,7 @@ import (
 
 	//nolint
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
@@ -13,10 +14,10 @@ import (
 )
 
 // ConfigureRouter starts server with base configuration.
-func ConfigureRouter() http.Handler {
+func ConfigureRouter(parsedFlags *config.StartupFalgs) http.Handler {
 	linksRepo := repository.NewInMemoryLinksRepository()
 	linksService := service.NewLinksService(linksRepo)
-	linksHandler := handler.NewLinkHandler(linksService)
+	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", linksHandler.GetRegisterLinkHandler)

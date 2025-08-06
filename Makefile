@@ -33,4 +33,4 @@ run:
 	go run $(pwd)/cmd/shortner/main.go
 
 build:
-	go build -o ./cmd/shortener/shortener ./cmd/shortener/main.go 
+	go build -o ./cmd/shortener/shortener ./cmd/shortener/.
