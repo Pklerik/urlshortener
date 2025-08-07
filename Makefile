@@ -34,3 +34,9 @@ run:
 
 build:
 	go build -o ./cmd/shortener/shortener ./cmd/shortener/.
+
+check_new:
+	echo "To Do"
+
+at: check_new
+	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -server-port=8080 -test.run="^TestIteration$(iter)"
