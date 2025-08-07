@@ -12,19 +12,24 @@ import (
 	"github.com/go-chi/chi"
 )
 
-// LinkHandler - wrapper for service handling.
-type LinkHandler struct {
-	linkService *service.LinkService
+type LinkHandler interface {
+	Get(w http.ResponseWriter, r *http.Request)
+	Post(w http.ResponseWriter, r *http.Request)
+}
+
+// LinkHandle - wrapper for service handling.
+type LinkHandle struct {
+	linkService service.LinkServicer
 	Args        *config.StartupFalgs
 }
 
 // NewLinkHandler returns instance of LinkHandler.
-func NewLinkHandler(userService *service.LinkService, args *config.StartupFalgs) *LinkHandler {
-	return &LinkHandler{linkService: userService, Args: args}
+func NewLinkHandler(userService service.LinkServicer, args *config.StartupFalgs) LinkHandler {
+	return &LinkHandle{linkService: userService, Args: args}
 }
 
-// GetRegisterLinkHandler returns Handler for URLs registration for GET method.
-func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Request) {
+// Get returns Handler for URLs registration for GET method.
+func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 	log.Printf(`Full request: %#v`, *r)
 
 	ld, err := lh.linkService.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
@@ -39,8 +44,8 @@ func (lh *LinkHandler) GetRegisterLinkHandler(w http.ResponseWriter, r *http.Req
 	log.Printf(`Full Link: %s, for Short "%s"`, ld.LongURL, chi.URLParam(r, "shortURL"))
 }
 
-// PostRegisterLinkHandler returns Handler for URLs registration for GET method.
-func (lh *LinkHandler) PostRegisterLinkHandler(w http.ResponseWriter, r *http.Request) {
+// Post returns Handler for URLs registration for GET method.
+func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 	err := validators.TextPlain(w, r)
 	if err != nil {
 		return

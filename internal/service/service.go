@@ -21,18 +21,23 @@ var (
 	ErrCollision = errors.New("collision for url in db")
 )
 
-// LinkService - structure for service repository realization.
-type LinkService struct {
-	linksRepo repository.LinksRepository
+type LinkServicer interface {
+	RegisterLink(ctx context.Context, longURL string) (model.LinkData, error)
+	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
+}
+
+// BaseLinkService - structure for service repository realization.
+type BaseLinkService struct {
+	linksRepo repository.LinksStorager
 }
 
 // NewLinksService - provide instance of service.
-func NewLinksService(repo repository.LinksRepository) *LinkService {
-	return &LinkService{linksRepo: repo}
+func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
+	return &BaseLinkService{linksRepo: repo}
 }
 
 // RegisterLink - register the Link with provided longURL.
-func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
+func (ls *BaseLinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
 	var shortURL string
 
 	//nolint
@@ -66,7 +71,7 @@ func (ls *LinkService) RegisterLink(ctx context.Context, longURL string) (model.
 
 // GetShort - provide model.LinkData and error
 // If shortURL is absent returns err.
-func (ls *LinkService) GetShort(ctx context.Context, shortURL string) (model.LinkData, error) {
+func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model.LinkData, error) {
 	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
 	if err != nil {
 		return ld, fmt.Errorf("(ls *LinkService) GetShort: %w", err)

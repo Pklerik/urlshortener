@@ -21,8 +21,8 @@ func handler(parsedArgs *config.StartupFalgs) http.Handler {
 	linksHandler := NewLinkHandler(linksService, parsedArgs)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", linksHandler.GetRegisterLinkHandler)
-		r.Post("/", linksHandler.PostRegisterLinkHandler)
+		r.Get("/{shortURL}", linksHandler.Get)
+		r.Post("/", linksHandler.Post)
 	})
 	return r
 }
