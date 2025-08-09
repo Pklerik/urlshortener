@@ -35,6 +35,9 @@ func (r *InMemoryLinksRepository) Create(_ context.Context, linkData model.LinkD
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if ld, ok := r.Shorts[linkData.ShortURL]; ok {
+		return *ld, ErrExistingURL
+	}
 	r.Shorts[linkData.ShortURL] = &linkData
 
 	return linkData, nil
