@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi"
 )
 
+// LinkHandler - provide contract for request handling.
 type LinkHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	Post(w http.ResponseWriter, r *http.Request)
