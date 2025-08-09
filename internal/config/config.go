@@ -83,7 +83,7 @@ type Timeout struct {
 
 // String - represent timeout in seconds.
 func (t *Timeout) String() string {
-	return fmt.Sprintf("timeout seconds: %f", t)
+	return fmt.Sprintf("timeout seconds: %f", t.Seconds)
 }
 
 // Set - set Timeout from string.
