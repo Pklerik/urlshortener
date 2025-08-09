@@ -51,7 +51,8 @@ func (ls *BaseLinkService) RegisterLink(ctx context.Context, longURL string) (mo
 	}
 
 	ld, err := ls.linksRepo.Create(ctx, model.LinkData{ShortURL: shortURL, LongURL: longURL})
-	if !errors.Is(err, repository.ErrExistingURL) {
+
+	if err != nil && !errors.Is(err, repository.ErrExistingURL) {
 		return ld, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
 

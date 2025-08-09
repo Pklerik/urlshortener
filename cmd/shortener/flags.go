@@ -6,12 +6,12 @@ import (
 	"github.com/Pklerik/urlshortener/internal/config"
 )
 
-func parseFlags() *config.StartupFlags {
+func parseFlags() config.StartupFlagsParser {
 	// Set default vars
 	parsedArgs := new(config.StartupFlags)
 	flag.Var(&parsedArgs.ServerAddress, "a", "address and port to run server")
 	flag.StringVar(&parsedArgs.AddressShortURL, "b", "http://localhost:8080", "protocol://address:port for shortened urls")
-	flag.Var(&parsedArgs.Timeout, "timeout", "Custom timeout. Example: --timeout 1m2s3ms sets timeout to 62.003 seconds. Default: 10m")
+	flag.Float64Var(&parsedArgs.Timeout, "timeout", 600, "Custom timeout. Example: --timeout 635.456 sets timeout to 635.456 seconds. Default: 600s")
 	flag.Parse()
 
 	return parsedArgs

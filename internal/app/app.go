@@ -19,7 +19,7 @@ import (
 )
 
 // StartApp - starts server app function.
-func StartApp(parsedArgs *config.StartupFlags) {
+func StartApp(parsedArgs config.StartupFlagsParser) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -30,13 +30,13 @@ func StartApp(parsedArgs *config.StartupFlags) {
 		cancel()
 	}()
 
-	argPort := ":" + strconv.Itoa(parsedArgs.ServerAddress.Port)
+	argPort := ":" + strconv.Itoa(parsedArgs.GetServerAddress().Port)
 	log.Printf("Setup server with args: port: %s", argPort)
 	httpServer := &http.Server{
 		Addr:         argPort,
 		Handler:      router.ConfigureRouter(parsedArgs),
-		ReadTimeout:  time.Duration(parsedArgs.Timeout.Seconds * float64(time.Second)),
-		WriteTimeout: time.Duration(parsedArgs.Timeout.Seconds * float64(time.Second)),
+		ReadTimeout:  time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
+		WriteTimeout: time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)

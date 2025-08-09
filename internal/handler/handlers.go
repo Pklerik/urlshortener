@@ -21,11 +21,11 @@ type LinkHandler interface {
 // LinkHandle - wrapper for service handling.
 type LinkHandle struct {
 	linkService service.LinkServicer
-	Args        *config.StartupFlags
+	Args        config.StartupFlagsParser
 }
 
 // NewLinkHandler returns instance of LinkHandler.
-func NewLinkHandler(userService service.LinkServicer, args *config.StartupFlags) LinkHandler {
+func NewLinkHandler(userService service.LinkServicer, args config.StartupFlagsParser) LinkHandler {
 	return &LinkHandle{linkService: userService, Args: args}
 }
 
@@ -74,7 +74,7 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	redirectURL := lh.Args.AddressShortURL + "/" + ld.ShortURL
+	redirectURL := lh.Args.GetAddressShortURL() + "/" + ld.ShortURL
 
 	_, err = w.Write([]byte(redirectURL))
 	if err != nil {
