@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// StartupFalgs - app startup flags.
-type StartupFalgs struct {
+// StartupFlags - app startup flags.
+type StartupFlags struct {
 	ServerAddress   Address
 	AddressShortURL string
 	Timeout         Timeout

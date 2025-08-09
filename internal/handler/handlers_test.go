@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func handler(parsedArgs *config.StartupFalgs) http.Handler {
+func handler(parsedArgs *config.StartupFlags) http.Handler {
 	linksRepo := repository.NewInMemoryLinksRepository()
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := NewLinkHandler(linksService, parsedArgs)
@@ -36,7 +36,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testURL := "http://ya.ru"
 	redirectHost := "http://test_host:2345"
 
-	r := handler(&config.StartupFalgs{
+	r := handler(&config.StartupFlags{
 		AddressShortURL: redirectHost,
 	})
 	srv := httptest.NewServer(r)

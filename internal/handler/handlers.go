@@ -20,11 +20,11 @@ type LinkHandler interface {
 // LinkHandle - wrapper for service handling.
 type LinkHandle struct {
 	linkService service.LinkServicer
-	Args        *config.StartupFalgs
+	Args        *config.StartupFlags
 }
 
 // NewLinkHandler returns instance of LinkHandler.
-func NewLinkHandler(userService service.LinkServicer, args *config.StartupFalgs) LinkHandler {
+func NewLinkHandler(userService service.LinkServicer, args *config.StartupFlags) LinkHandler {
 	return &LinkHandle{linkService: userService, Args: args}
 }
 

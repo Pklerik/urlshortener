@@ -19,7 +19,7 @@ import (
 )
 
 // StartApp - starts server app function.
-func StartApp(parsedArgs *config.StartupFalgs) {
+func StartApp(parsedArgs *config.StartupFlags) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
