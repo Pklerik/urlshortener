@@ -33,7 +33,6 @@ linters:
     - ineffassign
     - misspell
     - nakedret
-    - nolintlint
     - prealloc
     - revive
     - staticcheck

@@ -37,6 +37,7 @@ build:
 
 check_new:
 	echo "To Do"
-
+	
+# example make a iter=5 for run 5ths iteration
 at: check_new
 	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -server-port=8080 -test.run="^TestIteration$(iter)"
