@@ -18,14 +18,18 @@ func parseFlags() config.StartupFlagsParser {
 
 	envArgs := new(config.StartupFlags)
 	err := env.Parse(&envArgs)
+
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	if envArgs.ServerAddress != nil {
 		parsedArgs.ServerAddress = envArgs.ServerAddress
 	}
+
 	if envArgs.BaseURL != "" {
 		parsedArgs.BaseURL = envArgs.BaseURL
 	}
+
 	return parsedArgs
 }

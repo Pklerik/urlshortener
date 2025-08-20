@@ -52,11 +52,13 @@ type Address struct {
 	Port     int
 }
 
+// UnmarshalText provide text unmarshaling for Address string.
 func (a *Address) UnmarshalText(text []byte) error {
 	err := a.Set(string(text))
 	if err != nil {
 		return fmt.Errorf("UnmarshalText: %w", err)
 	}
+
 	return nil
 }
 
