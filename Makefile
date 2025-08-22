@@ -38,6 +38,18 @@ build:
 check_new:
 	echo "To Do"
 	
-# example make a iter=5 for run 5ths iteration
+# example make a iter=5 for run 1-5ths iteration
 at: check_new
-	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -server-port=8080 -test.run="^TestIteration$$$(iter)"
+	number=1 ; while [[ $$number -le $(iter) ]] ; do \
+       	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -server-port=8080 -test.run="^TestIteration$$number$$" ; \
+		((number = number + 1)) ; \
+    done
+	echo "DONE"
+	
+# example make a iter=5 for run 1-5ths iteration only fails to output
+at_fail: check_new
+	number=1 ; while [[ $$number -le $(iter) ]] ; do \
+       	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -server-port=8080 -test.run="^TestIteration$$number$$" | grep "FAIL: TestIteration" ; \
+		((number = number + 1)) ; \
+    done
+	echo "DONE"
