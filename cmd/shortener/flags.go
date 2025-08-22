@@ -11,13 +11,14 @@ import (
 func parseFlags() config.StartupFlagsParser {
 	// Set default vars
 	parsedArgs := new(config.StartupFlags)
+	parsedArgs.ServerAddress = new(config.Address)
 	flag.Var(parsedArgs.ServerAddress, "a", "address and port to run server")
 	flag.StringVar(&parsedArgs.BaseURL, "b", "http://localhost:8080", "protocol://address:port for shortened urls")
 	flag.Float64Var(&parsedArgs.Timeout, "timeout", 600, "Custom timeout. Example: --timeout 635.456 sets timeout to 635.456 seconds. Default: 600s")
 	flag.Parse()
 
 	envArgs := new(config.StartupFlags)
-	err := env.Parse(&envArgs)
+	err := env.Parse(envArgs)
 
 	if err != nil {
 		log.Fatal(err)
