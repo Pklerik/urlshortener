@@ -37,7 +37,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 	redirectHost := "http://test_host:2345"
 
 	r := handler(&config.StartupFlags{
-		AddressShortURL: redirectHost,
+		BaseURL: redirectHost,
 	})
 	srv := httptest.NewServer(r)
 	defer srv.Close()

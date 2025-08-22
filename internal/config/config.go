@@ -16,28 +16,28 @@ type StartupFlagsParser interface {
 
 // StartupFlags app startup flags.
 type StartupFlags struct {
-	ServerAddress   Address
-	AddressShortURL string
-	Timeout         float64
+	ServerAddress *Address `env:"SERVER_ADDRESS"`
+	BaseURL       string   `env:"BASE_URL"`
+	Timeout       float64
 }
 
 // GetFlags provide string representation of flag.
 func (sf *StartupFlags) GetFlags() string {
 	return fmt.Sprintf("ServerAddress: %s, AddressShortURL: %s, Timeout: %f",
 		sf.ServerAddress.String(),
-		sf.AddressShortURL,
+		sf.BaseURL,
 		sf.Timeout,
 	)
 }
 
 // GetServerAddress returns ServerAddress.
 func (sf *StartupFlags) GetServerAddress() Address {
-	return sf.ServerAddress
+	return *sf.ServerAddress
 }
 
 // GetAddressShortURL returns AddressShortURL.
 func (sf *StartupFlags) GetAddressShortURL() string {
-	return sf.AddressShortURL
+	return sf.BaseURL
 }
 
 // GetTimeout returns GetTimeout.
@@ -50,6 +50,16 @@ type Address struct {
 	Protocol string
 	Host     string
 	Port     int
+}
+
+// UnmarshalText provide text unmarshaling for Address string.
+func (a *Address) UnmarshalText(text []byte) error {
+	err := a.Set(string(text))
+	if err != nil {
+		return fmt.Errorf("UnmarshalText: %w", err)
+	}
+
+	return nil
 }
 
 // String provide string representation of Address.
