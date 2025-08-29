@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
+	"log"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/caarlos0/env/v11"
 )
 
@@ -22,7 +22,7 @@ func parseFlags() config.StartupFlagsParser {
 
 	err := env.Parse(envArgs)
 	if err != nil {
-		logger.Log.Fatal(err.Error())
+		log.Fatal(err)
 	}
 
 	if envArgs.ServerAddress != nil {
