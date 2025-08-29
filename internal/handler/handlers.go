@@ -78,7 +78,7 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte(redirectURL))
 	if err != nil {
-		logger.Sugar.Infof(`Unexpected exception: status: %d`, http.StatusInternalServerError)
+		logger.Sugar.Infof(`Unexpected exception: status: %w`, err)
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
 
 		return

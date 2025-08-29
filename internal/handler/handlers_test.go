@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
@@ -21,8 +23,8 @@ func handler(parsedArgs *config.StartupFlags) http.Handler {
 	linksHandler := NewLinkHandler(linksService, parsedArgs)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", linksHandler.Get)
-		r.Post("/", linksHandler.Post)
+		r.Get("/{shortURL}", middleware.WithLogging(linksHandler.Get))
+		r.Post("/", middleware.WithLogging(linksHandler.Post))
 	})
 	return r
 }
@@ -36,6 +38,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testURL := "http://ya.ru"
 	redirectHost := "http://test_host:2345"
 
+	logger.Initialize("INFO")
 	r := handler(&config.StartupFlags{
 		BaseURL: redirectHost,
 	})
