@@ -19,8 +19,8 @@ func parseFlags() config.StartupFlagsParser {
 	flag.Parse()
 
 	envArgs := new(config.StartupFlags)
-	err := env.Parse(envArgs)
 
+	err := env.Parse(envArgs)
 	if err != nil {
 		logger.Log.Fatal(err.Error())
 	}

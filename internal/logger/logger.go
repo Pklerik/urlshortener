@@ -1,6 +1,8 @@
+// Package logger provide singleton Log logger for service.
 package logger
 
 import (
+	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
@@ -9,6 +11,8 @@ import (
 // Log будет доступен всему коду как синглтон.
 // По умолчанию установлен no-op-логер, который не выводит никаких сообщений.
 var Log *zap.Logger = zap.NewNop()
+
+// Sugar *zap.SugaredLogger.
 var Sugar *zap.SugaredLogger
 
 // Initialize инициализирует синглтон логера с необходимым уровнем логирования.
@@ -16,7 +20,7 @@ func Initialize(level string) error {
 	// преобразуем текстовый уровень логирования в zap.AtomicLevel
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
-		return err
+		return fmt.Errorf("Initialize: %w", err)
 	}
 	// создаём новую конфигурацию логера
 	cfg := zap.NewProductionConfig()
@@ -25,11 +29,12 @@ func Initialize(level string) error {
 	// создаём логер на основе конфигурации
 	zl, err := cfg.Build()
 	if err != nil {
-		return err
+		return fmt.Errorf("Initialize: %w", err)
 	}
 	// устанавливаем синглтон
 	Log = zl
 	Sugar = Log.Sugar()
+
 	return nil
 }
 
