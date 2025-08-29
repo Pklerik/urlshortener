@@ -3,7 +3,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/router"
 	"golang.org/x/sync/errgroup"
 )
@@ -31,7 +31,7 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 	}()
 
 	argPort := ":" + strconv.Itoa(parsedArgs.GetServerAddress().Port)
-	log.Printf("Setup server with args: port: %s", argPort)
+	logger.Sugar.Infof("Setup server with args: port: %s", argPort)
 	httpServer := &http.Server{
 		Addr:         argPort,
 		Handler:      router.ConfigureRouter(parsedArgs),
@@ -41,17 +41,17 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		log.Println("Starting server")
+		logger.Sugar.Infof("Starting server")
 		return httpServer.ListenAndServe()
 	})
 	g.Go(func() error {
 		<-gCtx.Done()
-		log.Println("Stopped serving new connections.")
+		logger.Sugar.Infof("Stopped serving new connections.")
 
 		return httpServer.Shutdown(context.Background())
 	})
 
 	if err := g.Wait(); err != nil {
-		log.Printf("exit reason: %s \n", err)
+		logger.Sugar.Infof("exit reason: %s \n", err)
 	}
 }
