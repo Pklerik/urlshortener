@@ -24,7 +24,7 @@ func TestTextPlain(t *testing.T) {
 		args args
 		want want
 	}{
-		{name: "Wrong content", args: args{contentTypes: []string{"application/json"}}, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
+		{name: "Wrong content", args: args{contentTypes: []string{"text/json"}}, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
 		{name: "Empty content", args: args{contentTypes: []string{}}, want: want{code: http.StatusBadRequest, response: "Empty content type\n"}},
 		{name: "TextPlain", args: args{contentTypes: []string{"text/plain"}}, want: want{code: http.StatusOK, response: ""}},
 	}
