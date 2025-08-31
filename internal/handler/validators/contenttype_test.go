@@ -75,7 +75,7 @@ func TestApplicationJson(t *testing.T) {
 			}
 
 			w := httptest.NewRecorder()
-			ApplicationJson(w, request)
+			ApplicationJSON(w, request)
 			res := w.Result()
 
 			assert.Equal(t, tt.want.code, res.StatusCode)

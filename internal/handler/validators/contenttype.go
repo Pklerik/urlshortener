@@ -32,8 +32,8 @@ func TextPlain(res http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-// TextPlain check if Content-Type is `application/json`.
-func ApplicationJson(res http.ResponseWriter, req *http.Request) error {
+// ApplicationJSON check if Content-Type is `application/json`.
+func ApplicationJSON(res http.ResponseWriter, req *http.Request) error {
 	if value, ok := req.Header[`Content-Type`]; !ok {
 		http.Error(res, `Empty content type`, http.StatusBadRequest)
 		res.WriteHeader(http.StatusBadRequest)
