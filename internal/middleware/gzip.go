@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"compress/gzip"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")
+
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
 			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
@@ -28,6 +30,7 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 
 		// проверяем, что клиент отправил серверу сжатые данные в формате gzip
 		contentEncoding := r.Header.Get("Content-Encoding")
+
 		sendsGzip := strings.Contains(contentEncoding, "gzip")
 		if sendsGzip {
 			// оборачиваем тело запроса в io.Reader с поддержкой декомпрессии
@@ -47,7 +50,7 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
-// сжимать передаваемые данные и выставлять правильные HTTP-заголовки
+// сжимать передаваемые данные и выставлять правильные HTTP-заголовки.
 type compressWriter struct {
 	w  http.ResponseWriter
 	zw *gzip.Writer
@@ -65,23 +68,29 @@ func (c *compressWriter) Header() http.Header {
 }
 
 func (c *compressWriter) Write(p []byte) (int, error) {
-	return c.zw.Write(p)
+	l, err := c.zw.Write(p)
+	if err != nil {
+		return l, fmt.Errorf("(*compressWriter) Write zw: %w", err)
+	}
+
+	return l, nil
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
 	if statusCode < 300 {
 		c.w.Header().Set("Content-Encoding", "gzip")
 	}
+
 	c.w.WriteHeader(statusCode)
 }
 
 // Close закрывает gzip.Writer и досылает все данные из буфера.
 func (c *compressWriter) Close() error {
-	return c.zw.Close()
+	return fmt.Errorf("(*compressReader) Close zw: %w", c.zw.Close())
 }
 
 // compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера
-// декомпрессировать получаемые от клиента данные
+// декомпрессировать получаемые от клиента данные.
 type compressReader struct {
 	r  io.ReadCloser
 	zr *gzip.Reader
@@ -90,7 +99,7 @@ type compressReader struct {
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("newCompressReader: %w", err)
 	}
 
 	return &compressReader{
@@ -100,12 +109,18 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 }
 
 func (c compressReader) Read(p []byte) (n int, err error) {
-	return c.zr.Read(p)
+	l, err := c.zr.Read(p)
+	if err != nil {
+		return l, fmt.Errorf("(compressReader) Read zr: %w", err)
+	}
+
+	return l, nil
 }
 
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
-		return err
+		return fmt.Errorf("(*compressReader) Close r: %w", err)
 	}
-	return c.zr.Close()
+
+	return fmt.Errorf("(*compressReader) Close zr: %w", c.zr.Close())
 }
