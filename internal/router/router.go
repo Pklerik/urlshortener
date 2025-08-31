@@ -21,10 +21,10 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", middleware.WithLogging(linksHandler.Get))
-		r.Post("/", middleware.WithLogging(linksHandler.PostText))
+		r.Get("/{shortURL}", middleware.WithLogging(middleware.GZIPMiddleware(linksHandler.Get)))
+		r.Post("/", middleware.WithLogging(middleware.GZIPMiddleware(linksHandler.PostText)))
 		r.Route("/api", func(r chi.Router) {
-			r.Post("/shorten", middleware.WithLogging(linksHandler.PostJSON))
+			r.Post("/shorten", middleware.WithLogging(middleware.GZIPMiddleware(linksHandler.PostJSON)))
 		})
 	})
 

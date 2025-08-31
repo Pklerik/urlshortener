@@ -36,13 +36,15 @@ func handler(parsedArgs *config.StartupFlags) http.Handler {
 
 func TestRegisterLinkHandler(t *testing.T) {
 	type want struct {
-		code     int
-		response string
-		Location string
+		code                int
+		response            string
+		Headers             map[string][]string
+		Location            string
+		AcceptedContentType []string
 	}
-	testURL := "http://ya.ru"
+	testURL := []byte("http://ya.ru")
 	redirectHost := "http://test_host:2345"
-	testJSONReq := "{\"url\":\"http://ya.ru\"}"
+	testJSONReq := []byte("{\"url\":\"http://ya.ru\"}")
 	testJSONResp := "\"result\""
 
 	logger.Initialize("DEBUG")
@@ -64,22 +66,77 @@ func TestRegisterLinkHandler(t *testing.T) {
 	resBody := resp.Body()
 
 	tests := []struct {
-		name        string
-		method      string
-		contentType []string
-		body        *string
+		name    string
+		method  string
+		headers map[string][]string
+		body    *[]byte
 
 		additionalURL string
 		testError     string
 		redirectHost  string
 		want          want
 	}{
-		{name: "Post Created", method: http.MethodPost, redirectHost: redirectHost, contentType: []string{"text/plain"}, body: &testURL, want: want{code: http.StatusCreated, response: redirectHost}},
-		{name: "Wrong content", method: http.MethodPost, redirectHost: redirectHost, contentType: []string{"application/json"}, body: &testURL, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
-		{name: "Wrong Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/WERTADSD", want: want{code: http.StatusBadRequest, response: "Unable to find long URL for short\n"}},
-		{name: "Get Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled", want: want{code: http.StatusTemporaryRedirect, Location: testURL, response: ""}},
-		{name: "Post Created JSON", method: http.MethodPost, redirectHost: redirectHost, additionalURL: "/api/shorten", contentType: []string{"application/json"}, body: &testJSONReq, want: want{code: http.StatusCreated, response: testJSONResp}},
-		{name: "Wrong content JSON", method: http.MethodPost, redirectHost: redirectHost, additionalURL: "/api/shorten", contentType: []string{"text/plain"}, body: &testJSONReq, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
+		{name: "Post Created",
+			method:       http.MethodPost,
+			redirectHost: redirectHost,
+			headers:      map[string][]string{"Content-Type": {"text/plain"}},
+			body:         &testURL,
+			want:         want{code: http.StatusCreated, response: redirectHost}},
+		{name: "Wrong content",
+			method:       http.MethodPost,
+			redirectHost: redirectHost,
+			headers:      map[string][]string{"Content-Type": {"application/json"}},
+			body:         &testURL,
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "Wrong content type\n"}},
+		{name: "Wrong Redirect",
+			method:        http.MethodGet,
+			redirectHost:  redirectHost,
+			additionalURL: "/WERTADSD",
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "Unable to find long URL for short\n"}},
+		{name: "Get Redirect",
+			method:        http.MethodGet,
+			redirectHost:  redirectHost,
+			additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
+			want: want{
+				code:     http.StatusTemporaryRedirect,
+				Headers:  map[string][]string{"Location": {string(testURL)}},
+				response: ""}},
+		{name: "Post Created JSON",
+			method:        http.MethodPost,
+			redirectHost:  redirectHost,
+			additionalURL: "/api/shorten", headers: map[string][]string{"Content-Type": {"application/json"}},
+			body: &testJSONReq,
+			want: want{
+				code:     http.StatusCreated,
+				response: testJSONResp}},
+		{name: "Wrong content JSON",
+			method:        http.MethodPost,
+			redirectHost:  redirectHost,
+			additionalURL: "/api/shorten", headers: map[string][]string{"Content-Type": {"text/plain"}},
+			body: &testJSONReq,
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "Wrong content type\n"}},
+		{name: "Get Redirect GZIP",
+			method:        http.MethodGet,
+			redirectHost:  redirectHost,
+			additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
+			want: want{
+				code:     http.StatusTemporaryRedirect,
+				Headers:  map[string][]string{"Location": {string(testURL)}},
+				response: ""}},
+		{name: "Post Created JSON GZIP",
+			method:        http.MethodPost,
+			redirectHost:  redirectHost,
+			additionalURL: "/api/shorten", headers: map[string][]string{"Content-Type": {"application/json"}, "Accept-Encoding": {"gzip"}},
+			body: &testJSONReq,
+			want: want{
+				code:     http.StatusCreated,
+				response: testJSONResp}},
 	}
 
 	for _, tt := range tests {
@@ -90,7 +147,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 			if tt.body != nil {
 				req.Body = *tt.body
 			}
-			req.SetHeaderMultiValues(map[string][]string{`Content-Type`: tt.contentType})
+			req.SetHeaderMultiValues(tt.headers)
 
 			resp, err := req.Send()
 
@@ -102,7 +159,11 @@ func TestRegisterLinkHandler(t *testing.T) {
 			respBody := string(resp.Body())
 			assert.Contains(t, respBody, tt.want.response)
 			if resp.Header().Get("Location") != "" {
-				assert.Contains(t, resp.Header().Values("Location"), tt.want.Location)
+				locations, ok := tt.want.Headers["Location"]
+				if ok && len(locations) > 0 {
+					assert.Contains(t, resp.Header().Values("Location"), locations[0])
+				}
+				assert.NotEmpty(t, tt.want.Headers["Location"], "For test not provided location")
 			}
 
 		})
