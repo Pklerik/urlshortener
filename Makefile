@@ -21,6 +21,7 @@ pprof-cpu:
 	go tool pprof -http :9000 cpu.out
 
 lint:
+	go vet -vettool=$(which statictest) ./...
 	golangci-lint run ./...
 
 fdl:
