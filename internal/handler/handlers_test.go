@@ -18,14 +18,19 @@ import (
 )
 
 func handler(parsedArgs *config.StartupFlags) http.Handler {
+
 	linksRepo := repository.NewInMemoryLinksRepository()
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := NewLinkHandler(linksService, parsedArgs)
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", middleware.WithLogging(linksHandler.Get))
-		r.Post("/", middleware.WithLogging(linksHandler.Post))
+		r.Post("/", middleware.WithLogging(linksHandler.PostText))
+		r.Route("/api", func(r chi.Router) {
+			r.Post("/shorten", middleware.WithLogging(linksHandler.PostJSON))
+		})
 	})
+
 	return r
 }
 
@@ -37,8 +42,10 @@ func TestRegisterLinkHandler(t *testing.T) {
 	}
 	testURL := "http://ya.ru"
 	redirectHost := "http://test_host:2345"
+	testJsonReq := "{\"url\":\"http://ya.ru\"}"
+	testJsonResp := "\"result\""
 
-	logger.Initialize("INFO")
+	logger.Initialize("DEBUG")
 	r := handler(&config.StartupFlags{
 		BaseURL: redirectHost,
 	})
@@ -57,10 +64,11 @@ func TestRegisterLinkHandler(t *testing.T) {
 	resBody := resp.Body()
 
 	tests := []struct {
-		name          string
-		method        string
-		contentType   []string
-		body          *string
+		name        string
+		method      string
+		contentType []string
+		body        *string
+
 		additionalURL string
 		testError     string
 		redirectHost  string
@@ -70,6 +78,8 @@ func TestRegisterLinkHandler(t *testing.T) {
 		{name: "Wrong content", method: http.MethodPost, redirectHost: redirectHost, contentType: []string{"application/json"}, body: &testURL, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
 		{name: "Wrong Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/WERTADSD", want: want{code: http.StatusBadRequest, response: "Unable to find long URL for short\n"}},
 		{name: "Get Redirect", method: http.MethodGet, redirectHost: redirectHost, additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled", want: want{code: http.StatusTemporaryRedirect, Location: testURL, response: ""}},
+		{name: "Post Created JSON", method: http.MethodPost, redirectHost: redirectHost, additionalURL: "/api/shorten", contentType: []string{"application/json"}, body: &testJsonReq, want: want{code: http.StatusCreated, response: testJsonResp}},
+		{name: "Wrong content JSON", method: http.MethodPost, redirectHost: redirectHost, additionalURL: "/api/shorten", contentType: []string{"text/plain"}, body: &testJsonReq, want: want{code: http.StatusBadRequest, response: "Wrong content type\n"}},
 	}
 
 	for _, tt := range tests {
