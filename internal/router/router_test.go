@@ -1,7 +1,10 @@
 // Package handler contains handling logic for all pages
-package handler
+package router
 
 import (
+	"bytes"
+	"compress/gzip"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,32 +12,12 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
-	"github.com/Pklerik/urlshortener/internal/middleware"
-	"github.com/Pklerik/urlshortener/internal/repository"
-	"github.com/Pklerik/urlshortener/internal/service"
-	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 )
 
-func handler(parsedArgs *config.StartupFlags) http.Handler {
-
-	linksRepo := repository.NewInMemoryLinksRepository()
-	linksService := service.NewLinksService(linksRepo)
-	linksHandler := NewLinkHandler(linksService, parsedArgs)
-	r := chi.NewRouter()
-	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", middleware.WithLogging(linksHandler.Get))
-		r.Post("/", middleware.WithLogging(linksHandler.PostText))
-		r.Route("/api", func(r chi.Router) {
-			r.Post("/shorten", middleware.WithLogging(linksHandler.PostJSON))
-		})
-	})
-
-	return r
-}
-
 func TestRegisterLinkHandler(t *testing.T) {
+	logger.Initialize("DEBUG")
 	type want struct {
 		code                int
 		response            string
@@ -47,8 +30,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testJSONReq := []byte("{\"url\":\"http://ya.ru\"}")
 	testJSONResp := "\"result\""
 
-	logger.Initialize("DEBUG")
-	r := handler(&config.StartupFlags{
+	r := ConfigureRouter(&config.StartupFlags{
 		BaseURL: redirectHost,
 	})
 	srv := httptest.NewServer(r)
@@ -63,8 +45,8 @@ func TestRegisterLinkHandler(t *testing.T) {
 	resp, err := req.Send()
 	assert.NoError(t, err, "error making HTTP request")
 
+	// resBody := unzipResponse(resp)
 	resBody := resp.Body()
-
 	tests := []struct {
 		name    string
 		method  string
@@ -89,14 +71,14 @@ func TestRegisterLinkHandler(t *testing.T) {
 			body:         &testURL,
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Wrong content type\n"}},
+				response: "Wrong content type"}},
 		{name: "Wrong Redirect",
 			method:        http.MethodGet,
 			redirectHost:  redirectHost,
 			additionalURL: "/WERTADSD",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Unable to find long URL for short\n"}},
+				response: "Unable to find long URL for short"}},
 		{name: "Get Redirect",
 			method:        http.MethodGet,
 			redirectHost:  redirectHost,
@@ -120,7 +102,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 			body: &testJSONReq,
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Wrong content type\n"}},
+				response: "Wrong content type"}},
 		{name: "Get Redirect GZIP",
 			method:        http.MethodGet,
 			redirectHost:  redirectHost,
@@ -132,8 +114,18 @@ func TestRegisterLinkHandler(t *testing.T) {
 		{name: "Post Created JSON GZIP",
 			method:        http.MethodPost,
 			redirectHost:  redirectHost,
-			additionalURL: "/api/shorten", headers: map[string][]string{"Content-Type": {"application/json"}, "Accept-Encoding": {"gzip"}},
-			body: &testJSONReq,
+			additionalURL: "/api/shorten",
+			headers:       map[string][]string{"Content-Type": {"application/json"}, "Accept-Encoding": {"gzip"}},
+			body:          &testJSONReq,
+			want: want{
+				code:     http.StatusCreated,
+				response: testJSONResp}},
+		{name: "Post Created JSON GZIP encoding",
+			method:        http.MethodPost,
+			redirectHost:  redirectHost,
+			additionalURL: "/api/shorten",
+			headers:       map[string][]string{"Content-Type": {"application/json"}, "Accept-Encoding": {"gzip"}, "Content-Encoding": {"gzip"}},
+			body:          zipRequest(&testJSONReq),
 			want: want{
 				code:     http.StatusCreated,
 				response: testJSONResp}},
@@ -141,23 +133,23 @@ func TestRegisterLinkHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := client.R()
+			body := make([]byte, 100)
+			if tt.body != nil {
+				body = *tt.body
+			}
+			req := client.R().
+				SetHeaderMultiValues(tt.headers).
+				SetBody(body)
 			req.Method = tt.method
 			req.URL = srv.URL + tt.additionalURL
-			if tt.body != nil {
-				req.Body = *tt.body
-			}
-			req.SetHeaderMultiValues(tt.headers)
-
 			resp, err := req.Send()
 
 			if err != nil {
 				assert.ErrorContains(t, err, tt.testError)
 			}
-
+			respStr := string(resp.Body())
 			assert.Equal(t, tt.want.code, resp.StatusCode())
-			respBody := string(resp.Body())
-			assert.Contains(t, respBody, tt.want.response)
+			assert.Contains(t, respStr, tt.want.response)
 			if resp.Header().Get("Location") != "" {
 				locations, ok := tt.want.Headers["Location"]
 				if ok && len(locations) > 0 {
@@ -168,4 +160,21 @@ func TestRegisterLinkHandler(t *testing.T) {
 
 		})
 	}
+}
+
+func zipRequest(strByte *[]byte) *[]byte {
+
+	buf := bytes.NewBuffer(nil)
+	writer := gzip.NewWriter(buf)
+	defer writer.Close()
+
+	_, err := writer.Write(*strByte)
+	if err != nil {
+		log.Fatalf("Error writing compressed body: %v", err)
+	}
+	writer.Flush()
+	writer.Close()
+	respBytes := buf.Bytes()
+	logger.Sugar.Debugf("ByteStrCompressed data: %v ", respBytes)
+	return &respBytes
 }

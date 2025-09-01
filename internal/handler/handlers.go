@@ -56,6 +56,7 @@ func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 	err := validators.TextPlain(w, r)
 	if err != nil {
+		logger.Sugar.Debugf("Unsupported Content-type: Header: after validation:", w.Header().Values("Content-type"))
 		return
 	}
 
@@ -100,6 +101,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req model.Request
+	defer r.Body.Close()
 
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&req); err != nil {
