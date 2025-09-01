@@ -1,7 +1,7 @@
 // Package model contains structures for application and doesn't contain business logic.
 package model
 
-// LinkUUIDv7 is a custom type that embeds uuidv7.UUID
+// LinkUUIDv7 is a custom type that embeds uuidv7.UUID.
 type LinkUUIDv7 string
 
 // LinkData provide structure for URLs storage.

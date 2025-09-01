@@ -54,7 +54,7 @@ func (sf *StartupFlags) GetLogLevel() string {
 	return sf.LogLevel
 }
 
-// GetLogLevel returns LogLevel.
+// GetLocalStorage returns LogLevel.
 func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
