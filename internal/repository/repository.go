@@ -81,7 +81,7 @@ type LocalMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
 	basePath := config.BasePath
-	filePath = filepath.Clean(filepath.Join(basePath, filepath.Clean(filePath)))
+	filePath = filepath.Clean(filepath.Join(basePath, filePath))
 
 	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
