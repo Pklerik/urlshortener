@@ -120,6 +120,7 @@ func (c *compressWriter) Close() error {
 	if err := c.zw.Close(); err != nil {
 		return fmt.Errorf("(*compressReader) Close zw: %w", err)
 	}
+
 	return nil
 }
 
@@ -155,11 +156,12 @@ func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return fmt.Errorf("(*compressReader) Close r: %w", err)
 	}
+
 	if err := c.zr.Close(); err != nil {
 		return fmt.Errorf("(*compressReader) Close zr: %w", err)
 	}
-	return nil
 
+	return nil
 }
 
 // GZIPMiddleware provide gzip compression/decompression for request and response.
@@ -172,6 +174,7 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		logger.Log.Debug("GZIPMiddleware: ", zap.String("Accept-Encoding", acceptEncoding))
+
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		if supportsGzip {
 			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
@@ -192,6 +195,7 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 			if err != nil {
 				logger.Sugar.Errorf("Read compressed data error: %w", err)
 				w.WriteHeader(http.StatusInternalServerError)
+
 				return
 			}
 			// меняем тело запроса на новое

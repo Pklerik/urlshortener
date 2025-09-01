@@ -101,6 +101,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req model.Request
+
 	defer r.Body.Close()
 
 	dec := json.NewDecoder(r.Body)
