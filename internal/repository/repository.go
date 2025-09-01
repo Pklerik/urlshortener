@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/goccy/go-json"
@@ -81,7 +82,10 @@ type LocalMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
 	basePath := config.BasePath
-	filePath = filepath.Clean(filepath.Join(basePath, filePath))
+	if !strings.HasPrefix(filePath, "/") {
+		filePath = filepath.Join(basePath, filePath)
+	}
+	filePath = filepath.Clean(filePath)
 
 	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
