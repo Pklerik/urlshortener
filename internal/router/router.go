@@ -16,7 +16,7 @@ import (
 
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
-	linksRepo := repository.NewInMemoryLinksRepository()
+	linksRepo := repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
