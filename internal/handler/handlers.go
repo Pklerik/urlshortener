@@ -3,11 +3,11 @@ package handler
 
 import (
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
 )
@@ -31,11 +31,11 @@ func NewLinkHandler(userService service.LinkServicer, args config.StartupFlagsPa
 
 // Get returns Handler for URLs registration for GET method.
 func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
-	log.Printf(`Full request: %#v`, *r)
+	logger.Sugar.Infof(`Full request: %#v`, *r)
 
 	ld, err := lh.linkService.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
 	if err != nil {
-		log.Printf(`Unable to find long URL for short: %s: status: %d`, r.URL.Path[1:], http.StatusBadRequest)
+		logger.Sugar.Infof(`Unable to find long URL for short: %s: status: %d`, r.URL.Path[1:], http.StatusBadRequest)
 		http.Error(w, `Unable to find long URL for short`, http.StatusBadRequest)
 
 		return
@@ -44,7 +44,7 @@ func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Location", ld.LongURL)
 
 	w.WriteHeader(http.StatusTemporaryRedirect)
-	log.Printf(`Full Link: %s, for Short "%s"`, ld.LongURL, chi.URLParam(r, "shortURL"))
+	logger.Sugar.Infof(`Full Link: %s, for Short "%s"`, ld.LongURL, chi.URLParam(r, "shortURL"))
 }
 
 // Post returns Handler for URLs registration for GET method.
@@ -58,7 +58,7 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf(`Unable to read body: status: %d`, http.StatusBadRequest)
+		logger.Sugar.Infof(`Unable to read body: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to read body`, http.StatusBadRequest)
 
 		return
@@ -66,7 +66,7 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 
 	ld, err := lh.linkService.RegisterLink(r.Context(), string(body))
 	if err != nil {
-		log.Printf(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
+		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 
 		return
@@ -78,11 +78,11 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte(redirectURL))
 	if err != nil {
-		log.Printf(`Unexpected exception: status: %d`, http.StatusInternalServerError)
+		logger.Sugar.Infof(`Unexpected exception: status: %w`, err)
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
 
 		return
 	}
 
-	log.Printf(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, ld.LongURL)
+	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, ld.LongURL)
 }

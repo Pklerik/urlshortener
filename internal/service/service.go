@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
@@ -56,7 +56,7 @@ func (ls *BaseLinkService) RegisterLink(ctx context.Context, longURL string) (mo
 		return ld, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
 
-	log.Printf("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
+	logger.Sugar.Infof("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
 
 	return ld, nil
 }
