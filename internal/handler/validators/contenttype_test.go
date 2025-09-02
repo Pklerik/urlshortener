@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTextPlain(t *testing.T) {
+	logger.Initialize("DEBUG")
 	type args struct {
 		contentTypes []string
 	}
