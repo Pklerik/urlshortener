@@ -1,5 +1,5 @@
-// Package middleware provide decorators for handlers.
-package middleware
+// Package internalmiddleware provide decorators for handlers.
+package internalmiddleware
 
 import (
 	"compress/gzip"
@@ -83,8 +83,8 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // GZIPMiddleware provide gzip compression/decompression for request and response.
-func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func GZIPMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		// по умолчанию устанавливаем оригинальный http.ResponseWriter как тот,
 		// который будем передавать следующей функции
 		ow := w
@@ -119,8 +119,9 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// передаём управление хендлеру
-		h.ServeHTTP(ow, r)
+		next.ServeHTTP(ow, r)
 	}
+	return http.HandlerFunc(fn)
 }
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера

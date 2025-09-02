@@ -85,6 +85,7 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 	if !strings.HasPrefix(filePath, "/") {
 		filePath = filepath.Join(basePath, filePath)
 	}
+
 	filePath = filepath.Clean(filePath)
 
 	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
