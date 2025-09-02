@@ -23,13 +23,13 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	// r.Use(middleware.AllowContentEncoding("gzip", "deflate"))
-	// r.Use(middleware.Compress(5, "gzip", "deflate"))
-	r.Use(internalmiddleware.GZIPMiddleware)
+	r.Use(
+		middleware.RequestID,
+		middleware.RealIP,
+		middleware.Logger,
+		middleware.Recoverer,
+		internalmiddleware.GZIPMiddleware,
+	)
 
 	r.Use(middleware.Timeout(time.Duration(60 * parsedFlags.GetTimeout() * float64(time.Second))))
 

@@ -101,14 +101,12 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 // Create - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
 func (r *LocalMemoryLinksRepository) Create(_ context.Context, linkData model.LinkData) (model.LinkData, error) {
 	slStorage, err := r.Read()
-	for _, linkInfo := range slStorage {
-		if linkInfo.ShortURL == linkData.ShortURL {
-			return linkInfo, nil
-		}
-	}
-
 	if err != nil {
-		return model.LinkData{}, fmt.Errorf("unable to finde link: %w", err)
+		return model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
+	}
+	ld, ok := slContains(linkData.ShortURL, slStorage)
+	if ok {
+		return ld, nil
 	}
 
 	slStorage = append(slStorage, linkData)
@@ -127,10 +125,9 @@ func (r *LocalMemoryLinksRepository) FindShort(_ context.Context, short string) 
 		return model.LinkData{}, fmt.Errorf("unable to find link: %w", err)
 	}
 
-	for _, linkInfo := range slStorage {
-		if linkInfo.ShortURL == short {
-			return linkInfo, nil
-		}
+	ld, ok := slContains(short, slStorage)
+	if ok {
+		return ld, nil
 	}
 
 	return model.LinkData{}, ErrNotFoundLink
@@ -173,4 +170,13 @@ func (r *LocalMemoryLinksRepository) Write(data []model.LinkData) error {
 	}
 
 	return nil
+}
+
+func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, bool) {
+	for _, linkInfo := range slLinkData {
+		if linkInfo.ShortURL == shortURL {
+			return linkInfo, true
+		}
+	}
+	return model.LinkData{}, false
 }
