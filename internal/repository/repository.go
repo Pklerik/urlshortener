@@ -104,6 +104,7 @@ func (r *LocalMemoryLinksRepository) Create(_ context.Context, linkData model.Li
 	if err != nil {
 		return model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
+
 	ld, ok := slContains(linkData.ShortURL, slStorage)
 	if ok {
 		return ld, nil
@@ -178,5 +179,6 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 			return linkInfo, true
 		}
 	}
+
 	return model.LinkData{}, false
 }

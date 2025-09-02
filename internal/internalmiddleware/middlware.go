@@ -121,6 +121,7 @@ func GZIPMiddleware(next http.Handler) http.Handler {
 		// передаём управление хендлеру
 		next.ServeHTTP(ow, r)
 	}
+
 	return http.HandlerFunc(fn)
 }
 
