@@ -31,7 +31,8 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testJSONResp := "\"result\""
 
 	r := ConfigureRouter(&config.StartupFlags{
-		BaseURL: redirectHost,
+		BaseURL:      redirectHost,
+		LocalStorage: "../../local_storage.json",
 	})
 	srv := httptest.NewServer(r)
 	defer srv.Close()

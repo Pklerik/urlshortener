@@ -13,6 +13,7 @@ type StartupFlagsParser interface {
 	GetAddressShortURL() string
 	GetTimeout() float64
 	GetLogLevel() string
+	GetLocalStorage() string
 }
 
 // StartupFlags app startup flags.
@@ -20,6 +21,7 @@ type StartupFlags struct {
 	ServerAddress *Address `env:"SERVER_ADDRESS"`
 	BaseURL       string   `env:"BASE_URL"`
 	LogLevel      string   `env:"LOG_LEVEL"`
+	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
 	Timeout       float64
 }
 
@@ -50,6 +52,11 @@ func (sf *StartupFlags) GetTimeout() float64 {
 // GetLogLevel returns LogLevel.
 func (sf *StartupFlags) GetLogLevel() string {
 	return sf.LogLevel
+}
+
+// GetLocalStorage returns LogLevel.
+func (sf *StartupFlags) GetLocalStorage() string {
+	return sf.LocalStorage
 }
 
 // Address base struct.

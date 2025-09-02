@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 
@@ -77,7 +78,6 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-
 	w.WriteHeader(http.StatusCreated)
 
 	redirectURL := lh.Args.GetAddressShortURL() + "/" + ld.ShortURL
@@ -103,8 +103,15 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	var req model.Request
 
 	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
 
-	dec := json.NewDecoder(r.Body)
+		return
+	}
+	reader := io.NopCloser(bytes.NewReader(body))
+	dec := json.NewDecoder(reader)
 	if err := dec.Decode(&req); err != nil {
 		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)

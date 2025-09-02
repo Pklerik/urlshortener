@@ -13,6 +13,7 @@ import (
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
+	"github.com/samborkent/uuidv7"
 )
 
 var (
@@ -50,7 +51,7 @@ func (ls *BaseLinkService) RegisterLink(ctx context.Context, longURL string) (mo
 		return model.LinkData{}, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
 
-	ld, err := ls.linksRepo.Create(ctx, model.LinkData{ShortURL: shortURL, LongURL: longURL})
+	ld, err := ls.linksRepo.Create(ctx, model.LinkData{UUID: model.LinkUUIDv7(uuidv7.New().String()), ShortURL: shortURL, LongURL: longURL})
 
 	if err != nil && !errors.Is(err, repository.ErrExistingURL) {
 		return ld, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)

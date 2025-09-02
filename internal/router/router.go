@@ -3,28 +3,41 @@ package router
 
 import (
 	"net/http"
+	"time"
 
 	//nolint
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
-	"github.com/Pklerik/urlshortener/internal/middleware"
+	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 )
 
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
-	linksRepo := repository.NewInMemoryLinksRepository()
+	linksRepo := repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
+
+	r.Use(
+		middleware.RequestID,
+		middleware.RealIP,
+		middleware.Logger,
+		middleware.Recoverer,
+		internalmiddleware.GZIPMiddleware,
+	)
+
+	r.Use(middleware.Timeout(time.Duration(60 * parsedFlags.GetTimeout() * float64(time.Second))))
+
 	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", middleware.ApplyMiddleware(linksHandler.Get, middleware.GZIPMiddleware, middleware.WithLogging))
-		r.Post("/", middleware.ApplyMiddleware(linksHandler.PostText, middleware.GZIPMiddleware, middleware.WithLogging))
+		r.Get("/{shortURL}", linksHandler.Get)
+		r.Post("/", linksHandler.PostText)
 		r.Route("/api", func(r chi.Router) {
-			r.Post("/shorten", middleware.ApplyMiddleware(linksHandler.PostJSON, middleware.GZIPMiddleware, middleware.WithLogging))
+			r.Post("/shorten", linksHandler.PostJSON)
 		})
 	})
 

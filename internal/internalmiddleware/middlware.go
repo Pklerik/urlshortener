@@ -1,5 +1,5 @@
-// Package middleware provide decorators for handlers.
-package middleware
+// Package internalmiddleware provide decorators for handlers.
+package internalmiddleware
 
 import (
 	"compress/gzip"
@@ -46,7 +46,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 // WithLogging добавляет дополнительный код для регистрации сведений о запросе
 // и возвращает новый http.Handler.
-func WithLogging(h http.HandlerFunc) http.HandlerFunc {
+func WithLogging(next http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		// функция Now() возвращает текущее время
 		start := time.Now()
@@ -61,7 +61,7 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 			responseData:   responseData,
 		}
 
-		h.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
+		next.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
 
 		// Since возвращает разницу во времени между start
 		// и моментом вызова Since. Таким образом можно посчитать
@@ -83,8 +83,8 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // GZIPMiddleware provide gzip compression/decompression for request and response.
-func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func GZIPMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
 		// по умолчанию устанавливаем оригинальный http.ResponseWriter как тот,
 		// который будем передавать следующей функции
 		ow := w
@@ -119,8 +119,9 @@ func GZIPMiddleware(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// передаём управление хендлеру
-		h.ServeHTTP(ow, r)
+		next.ServeHTTP(ow, r)
 	}
+	return http.HandlerFunc(fn)
 }
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера

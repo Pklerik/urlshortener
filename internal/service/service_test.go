@@ -27,7 +27,7 @@ func TestBaseLinkService_RegisterLink(t *testing.T) {
 		want    model.LinkData
 		wantErr bool
 	}{
-		{name: "Base", fields: fields{linksRepo: repository.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURL: "http://ya.ru"}, want: model.LinkData{ShortURL: "398f0ca4", LongURL: "http://ya.ru"}, wantErr: false},
+		{name: "Base", fields: fields{linksRepo: repository.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURL: "http://ya.ru"}, want: model.LinkData{ShortURL: "398f0ca4"}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestBaseLinkService_RegisterLink(t *testing.T) {
 				t.Errorf("BaseLinkService.RegisterLink() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !reflect.DeepEqual(got.ShortURL, tt.want.ShortURL) {
 				t.Errorf("BaseLinkService.RegisterLink() = %v, want %v", got, tt.want)
 			}
 		})
