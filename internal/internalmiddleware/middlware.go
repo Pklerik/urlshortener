@@ -46,7 +46,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 
 // WithLogging добавляет дополнительный код для регистрации сведений о запросе
 // и возвращает новый http.Handler.
-func WithLogging(h http.HandlerFunc) http.HandlerFunc {
+func WithLogging(next http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		// функция Now() возвращает текущее время
 		start := time.Now()
@@ -61,7 +61,7 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 			responseData:   responseData,
 		}
 
-		h.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
+		next.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
 
 		// Since возвращает разницу во времени между start
 		// и моментом вызова Since. Таким образом можно посчитать
