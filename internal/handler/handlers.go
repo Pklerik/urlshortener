@@ -5,17 +5,22 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/goccy/go-json"
+
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
 // LinkHandler - provide contract for request handling.
 type LinkHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
-	Post(w http.ResponseWriter, r *http.Request)
+	PostText(w http.ResponseWriter, r *http.Request)
+	PostJSON(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -47,8 +52,8 @@ func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 	logger.Sugar.Infof(`Full Link: %s, for Short "%s"`, ld.LongURL, chi.URLParam(r, "shortURL"))
 }
 
-// Post returns Handler for URLs registration for GET method.
-func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
+// PostText returns Handler for URLs registration for GET method.
+func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 	err := validators.TextPlain(w, r)
 	if err != nil {
 		return
@@ -85,4 +90,49 @@ func (lh *LinkHandle) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, ld.LongURL)
+}
+
+// PostJSON returns Handler for URLs registration for GET method.
+func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
+	err := validators.ApplicationJSON(w, r)
+	if err != nil {
+		return
+	}
+
+	var req model.Request
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	ld, err := lh.linkService.RegisterLink(r.Context(), req.URL)
+	if err != nil {
+		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
+		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
+
+		return
+	}
+
+	resp := model.Response{
+		Result: lh.Args.GetAddressShortURL() + "/" + ld.ShortURL,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	enc := json.NewEncoder(w)
+	logger.Sugar.Debugf("Head: %v", w.Header())
+
+	if err := enc.Encode(resp); err != nil {
+		logger.Log.Debug("error encoding response", zap.Error(err))
+		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
+
+		return
+	}
+
+	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, ld.LongURL)
 }
