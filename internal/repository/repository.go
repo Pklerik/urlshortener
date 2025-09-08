@@ -3,6 +3,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/goccy/go-json"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -22,12 +25,15 @@ var (
 	ErrNotFoundLink = errors.New("link was not found")
 	// ErrExistingURL - can't crate record with existing shortURL.
 	ErrExistingURL = errors.New("can't crate record with existing shortURL")
+	// ErrEmptyDatabaseDSN - DatabaseDSN is empty.
+	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
 )
 
 // LinksStorager - interface for shortener service.
 type LinksStorager interface {
 	Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
+	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
 
 // InMemoryLinksRepository - simple in memory storage.
@@ -70,6 +76,11 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 	}
 
 	return *linkData, nil
+}
+
+// Ping returns ping info from db.
+func (r *InMemoryLinksRepository) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
+	return nil
 }
 
 // LocalMemoryLinksRepository - simple in memory storage.
@@ -181,4 +192,18 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 	}
 
 	return model.LinkData{}, false
+}
+
+// PingDB returns ping info from db.
+func (r *LocalMemoryLinksRepository) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
+	ps := args.GetDatabaseDSN()
+	if ps == "" {
+		return ErrEmptyDatabaseDSN
+	}
+	db, err := sql.Open("pgx", args.GetDatabaseDSN())
+	if err != nil {
+		return fmt.Errorf("unable to connect to DB: %w", err)
+	}
+	defer db.Close()
+	return nil
 }

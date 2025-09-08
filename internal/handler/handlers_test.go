@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/config/db"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
@@ -119,6 +121,40 @@ func TestLinkHandle_PostJson(t *testing.T) {
 				tt.fields.Args,
 			)
 			lh.PostText(tt.args.w, tt.args.r)
+		})
+	}
+}
+
+func TestLinkHandle_PingDB(t *testing.T) {
+	type fields struct {
+		linkService service.LinkServicer
+		Args        config.StartupFlagsParser
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{name: "base PING DB",
+			fields: fields{
+				linkService: service.NewLinksService(repository.NewLocalMemoryLinksRepository(baseConfig.GetLocalStorage())),
+				Args:        &config.StartupFlags{DBConf: &db.DBConf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
+			args: args{
+				w: httptest.NewRecorder(),
+				r: httptest.NewRequest("GET", "/ping", nil)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lh := NewLinkHandler(
+				tt.fields.linkService,
+				tt.fields.Args,
+			)
+			lh.PingDB(tt.args.w, tt.args.r)
 		})
 	}
 }

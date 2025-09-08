@@ -10,7 +10,6 @@ import (
 
 	//nolint
 	"syscall"
-	"time"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -35,8 +34,8 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 	httpServer := &http.Server{
 		Addr:         argPort,
 		Handler:      router.ConfigureRouter(parsedArgs),
-		ReadTimeout:  time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
-		WriteTimeout: time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
+		ReadTimeout:  parsedArgs.GetTimeout(),
+		WriteTimeout: parsedArgs.GetTimeout(),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)

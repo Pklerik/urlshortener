@@ -3,6 +3,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 
@@ -22,6 +23,7 @@ type LinkHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	PostText(w http.ResponseWriter, r *http.Request)
 	PostJSON(w http.ResponseWriter, r *http.Request)
+	PingDB(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -149,4 +151,15 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, ld.LongURL)
+}
+
+func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), lh.Args.GetTimeout())
+	defer cancel()
+	if err := lh.linkService.PingDB(ctx, lh.Args); err != nil {
+		http.Error(w, "ping db error", http.StatusInternalServerError)
+
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

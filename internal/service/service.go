@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
@@ -27,6 +28,7 @@ var (
 type LinkServicer interface {
 	RegisterLink(ctx context.Context, longURL string) (model.LinkData, error)
 	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
+	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
 
 // BaseLinkService - structure for service repository realization.
@@ -105,4 +107,12 @@ func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model
 	}
 
 	return ld, nil
+}
+
+// PingDB - provide error if DB is not accessed.
+func (ls *BaseLinkService) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
+	if err := ls.linksRepo.PingDB(ctx, args); err != nil {
+		return fmt.Errorf("PingDB error: %w", err)
+	}
+	return nil
 }

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Pklerik/urlshortener/internal/config/db"
 )
 
 // StartupFlagsParser provide interface for app flags.
@@ -11,9 +14,10 @@ type StartupFlagsParser interface {
 	GetFlags() string
 	GetServerAddress() Address
 	GetAddressShortURL() string
-	GetTimeout() float64
+	GetTimeout() time.Duration
 	GetLogLevel() string
 	GetLocalStorage() string
+	GetDatabaseDSN() string
 }
 
 // StartupFlags app startup flags.
@@ -22,7 +26,15 @@ type StartupFlags struct {
 	BaseURL       string   `env:"BASE_URL"`
 	LogLevel      string   `env:"LOG_LEVEL"`
 	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
+	DBConf        *db.DBConf
 	Timeout       float64
+}
+
+func NewStartupFlags() *StartupFlags {
+	return &StartupFlags{
+		ServerAddress: NewAddress(),
+		DBConf:        db.NewDBConf(),
+	}
 }
 
 // GetFlags provide string representation of flag.
@@ -45,8 +57,8 @@ func (sf *StartupFlags) GetAddressShortURL() string {
 }
 
 // GetTimeout returns GetTimeout.
-func (sf *StartupFlags) GetTimeout() float64 {
-	return sf.Timeout
+func (sf *StartupFlags) GetTimeout() time.Duration {
+	return time.Duration(sf.Timeout * float64(time.Second))
 }
 
 // GetLogLevel returns LogLevel.
@@ -59,11 +71,23 @@ func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
 
+func (sf *StartupFlags) GetDatabaseDSN() string {
+	return sf.DBConf.DatabaseDSN
+}
+
 // Address base struct.
 type Address struct {
 	Protocol string
 	Host     string
 	Port     int
+}
+
+func NewAddress() *Address {
+	return &Address{
+		Protocol: "http",
+		Host:     "localhost",
+		Port:     8080,
+	}
 }
 
 // UnmarshalText provide text unmarshaling for Address string.
