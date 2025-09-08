@@ -1,3 +1,7 @@
+#!make
+include .env
+export $(shell sed 's/=.*//' .env)
+
 upd_test:
 	git fetch template && git checkout template/main .github
 
@@ -42,7 +46,7 @@ check_new:
 # example make a iter=5 for run 1-5ths iteration
 at: check_new build
 	number=1 ; while [[ $$number -le $(iter) ]] ; do \
-       	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -file-storage-path=local_storage.json -server-port=58080 -test.run="^TestIteration$$number$$" ; \
+       	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -file-storage-path=local_storage.json -server-port=58080 -database-dsn=${DATABASE_DSN} -test.run="^TestIteration$$number$$" ; \
 		((number = number + 1)) ; \
     done
 	echo "DONE"
