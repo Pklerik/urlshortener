@@ -153,13 +153,18 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, ld.LongURL)
 }
 
+// PingDB provide 200 for successful database ping.
 func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
+	logger.Sugar.Infof(`Full request: %#v`, *r)
+
 	ctx, cancel := context.WithTimeout(context.Background(), lh.Args.GetTimeout())
 	defer cancel()
+
 	if err := lh.linkService.PingDB(ctx, lh.Args); err != nil {
 		http.Error(w, "ping db error", http.StatusInternalServerError)
 
 		return
 	}
+
 	w.WriteHeader(http.StatusOK)
 }

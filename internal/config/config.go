@@ -26,15 +26,8 @@ type StartupFlags struct {
 	BaseURL       string   `env:"BASE_URL"`
 	LogLevel      string   `env:"LOG_LEVEL"`
 	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
-	DBConf        *db.DBConf
+	DBConf        *db.Conf
 	Timeout       float64
-}
-
-func NewStartupFlags() *StartupFlags {
-	return &StartupFlags{
-		ServerAddress: NewAddress(),
-		DBConf:        db.NewDBConf(),
-	}
 }
 
 // GetFlags provide string representation of flag.
@@ -71,6 +64,7 @@ func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
 
+// GetDatabaseDSN return DSN string for db.
 func (sf *StartupFlags) GetDatabaseDSN() string {
 	return sf.DBConf.DatabaseDSN
 }
@@ -80,14 +74,6 @@ type Address struct {
 	Protocol string
 	Host     string
 	Port     int
-}
-
-func NewAddress() *Address {
-	return &Address{
-		Protocol: "http",
-		Host:     "localhost",
-		Port:     8080,
-	}
 }
 
 // UnmarshalText provide text unmarshaling for Address string.

@@ -114,5 +114,6 @@ func (ls *BaseLinkService) PingDB(ctx context.Context, args config.StartupFlagsP
 	if err := ls.linksRepo.PingDB(ctx, args); err != nil {
 		return fmt.Errorf("PingDB error: %w", err)
 	}
+
 	return nil
 }

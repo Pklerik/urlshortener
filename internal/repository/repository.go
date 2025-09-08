@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/goccy/go-json"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -78,8 +78,8 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 	return *linkData, nil
 }
 
-// Ping returns ping info from db.
-func (r *InMemoryLinksRepository) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
+// PingDB returns nil every time.
+func (r *InMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
 	return nil
 }
 
@@ -195,15 +195,17 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 }
 
 // PingDB returns ping info from db.
-func (r *LocalMemoryLinksRepository) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
+func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
 	ps := args.GetDatabaseDSN()
 	if ps == "" {
 		return ErrEmptyDatabaseDSN
 	}
+
 	db, err := sql.Open("pgx", args.GetDatabaseDSN())
 	if err != nil {
 		return fmt.Errorf("unable to connect to DB: %w", err)
 	}
 	defer db.Close()
+
 	return nil
 }

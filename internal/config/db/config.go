@@ -1,11 +1,7 @@
+// Package db provide database configurations.
 package db
 
-type DBConf struct {
+// Conf contain attrs for DB configuration.
+type Conf struct {
 	DatabaseDSN string `env:"DATABASE_DSN"`
-}
-
-func NewDBConf() *DBConf {
-	return &DBConf{
-		DatabaseDSN: "",
-	}
 }

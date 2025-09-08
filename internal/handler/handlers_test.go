@@ -143,7 +143,7 @@ func TestLinkHandle_PingDB(t *testing.T) {
 		{name: "base PING DB",
 			fields: fields{
 				linkService: service.NewLinksService(repository.NewLocalMemoryLinksRepository(baseConfig.GetLocalStorage())),
-				Args:        &config.StartupFlags{DBConf: &db.DBConf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
+				Args:        &config.StartupFlags{DBConf: &db.Conf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
 			args: args{
 				w: httptest.NewRecorder(),
 				r: httptest.NewRequest("GET", "/ping", nil)}},
