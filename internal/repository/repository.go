@@ -3,6 +3,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/goccy/go-json"
+	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -22,12 +25,15 @@ var (
 	ErrNotFoundLink = errors.New("link was not found")
 	// ErrExistingURL - can't crate record with existing shortURL.
 	ErrExistingURL = errors.New("can't crate record with existing shortURL")
+	// ErrEmptyDatabaseDSN - DatabaseDSN is empty.
+	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
 )
 
 // LinksStorager - interface for shortener service.
 type LinksStorager interface {
 	Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
+	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
 
 // InMemoryLinksRepository - simple in memory storage.
@@ -72,6 +78,11 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 	return *linkData, nil
 }
 
+// PingDB returns nil every time.
+func (r *InMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+	return nil
+}
+
 // LocalMemoryLinksRepository - simple in memory storage.
 type LocalMemoryLinksRepository struct {
 	File string
@@ -104,6 +115,7 @@ func (r *LocalMemoryLinksRepository) Create(_ context.Context, linkData model.Li
 	if err != nil {
 		return model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
+
 	ld, ok := slContains(linkData.ShortURL, slStorage)
 	if ok {
 		return ld, nil
@@ -178,5 +190,22 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 			return linkInfo, true
 		}
 	}
+
 	return model.LinkData{}, false
+}
+
+// PingDB returns ping info from db.
+func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
+	ps := args.GetDatabaseDSN()
+	if ps == "" {
+		return ErrEmptyDatabaseDSN
+	}
+
+	db, err := sql.Open("pgx", args.GetDatabaseDSN())
+	if err != nil {
+		return fmt.Errorf("unable to connect to DB: %w", err)
+	}
+	defer db.Close()
+
+	return nil
 }

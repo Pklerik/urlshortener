@@ -3,7 +3,6 @@ package router
 
 import (
 	"net/http"
-	"time"
 
 	//nolint
 
@@ -31,7 +30,7 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 		internalmiddleware.GZIPMiddleware,
 	)
 
-	r.Use(middleware.Timeout(time.Duration(60 * parsedFlags.GetTimeout() * float64(time.Second))))
+	r.Use(middleware.Timeout(parsedFlags.GetTimeout()))
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", linksHandler.Get)
@@ -39,6 +38,7 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 		r.Route("/api", func(r chi.Router) {
 			r.Post("/shorten", linksHandler.PostJSON)
 		})
+		r.Get("/ping", linksHandler.PingDB)
 	})
 
 	return r
