@@ -16,6 +16,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 )
@@ -46,7 +47,7 @@ type InMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewInMemoryLinksRepository() *InMemoryLinksRepository {
 	return &InMemoryLinksRepository{
-		Shorts: make(map[string]*model.LinkData, config.MapSize),
+		Shorts: make(map[string]*model.LinkData, dictionary.MapSize),
 	}
 }
 
@@ -92,7 +93,7 @@ type LocalMemoryLinksRepository struct {
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
-	basePath := config.BasePath
+	basePath := dictionary.BasePath
 	if !strings.HasPrefix(filePath, "/") {
 		filePath = filepath.Join(basePath, filePath)
 	}
@@ -196,16 +197,88 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 
 // PingDB returns ping info from db.
 func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
-	ps := args.GetDatabaseDSN()
+	ps := args.GetDatabaseConf().GetConnString()
 	if ps == "" {
 		return ErrEmptyDatabaseDSN
 	}
 
-	db, err := sql.Open("pgx", args.GetDatabaseDSN())
+	db, err := sql.Open("pgx", args.GetDatabaseConf().GetConnString())
 	if err != nil {
 		return fmt.Errorf("unable to connect to DB: %w", err)
 	}
 	defer db.Close()
 
 	return nil
+}
+
+type DBLinksRepository struct {
+	db *sql.DB
+	mu sync.RWMutex
+}
+
+// NewDBLinksRepository - provide new instance DBLinksRepository
+func NewDBLinksRepository(db *sql.DB) *DBLinksRepository {
+	return &DBLinksRepository{
+		db: db,
+	}
+}
+
+// Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
+func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error) {
+	var (
+		ld  model.LinkData
+		err error
+	)
+	if ld, err = r.getShort(ctx, linkData.ShortURL); err != nil {
+		return ld, ErrExistingURL
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return linkData, fmt.Errorf("error creating tx error: %w", err)
+	}
+	res, err := tx.ExecContext(ctx, "INSERT INTO shortener.links (uuid, short_url, long_url) VALUES($1, $2, $3)", ld.UUID, ld.ShortURL, ld.LongURL)
+	if err != nil {
+		return linkData, fmt.Errorf("error inserting data to db: %w", err)
+	}
+	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
+		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
+	}
+
+	return linkData, nil
+}
+
+// FindShort - provide model.LinkData and error
+// If shortURL is absent returns ErrNotFoundLink.
+func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
+	var (
+		ld  model.LinkData
+		err error
+	)
+	if ld, err = r.getShort(ctx, short); err != nil {
+		return ld, ErrExistingURL
+	}
+
+	return ld, nil
+}
+
+// PingDB returns nil every time.
+func (r *DBLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+	return nil
+}
+
+func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.LinkData, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	linkData := model.LinkData{}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return linkData, fmt.Errorf("error creating tx error: %w", err)
+	}
+	row := tx.QueryRowContext(ctx, "SELECT uuid, short_url, long_url FROM shortener.links WHERE short_url LIKE $1", short)
+	if err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL); err != nil {
+		return linkData, fmt.Errorf("error selecting db data: %w", err)
+	}
+	return linkData, nil
 }

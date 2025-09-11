@@ -1,5 +1,5 @@
-// Package config contains all configuration for the app
-package config
+// Package dictionary contains all configuration for the app
+package dictionary
 
 import (
 	"log"
@@ -10,8 +10,6 @@ import (
 const (
 	// MapSize - base map size.
 	MapSize = 100
-	// ShortURLLen provide len of short url.
-	ShortURLLen = 10
 )
 
 var (

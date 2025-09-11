@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/config/db"
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
@@ -143,7 +143,7 @@ func TestLinkHandle_PingDB(t *testing.T) {
 		{name: "base PING DB",
 			fields: fields{
 				linkService: service.NewLinksService(repository.NewLocalMemoryLinksRepository(baseConfig.GetLocalStorage())),
-				Args:        &config.StartupFlags{DBConf: &db.Conf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
+				Args:        &config.StartupFlags{DBConf: &dbconf.Conf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
 			args: args{
 				w: httptest.NewRecorder(),
 				r: httptest.NewRequest("GET", "/ping", nil)}},

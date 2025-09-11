@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Pklerik/urlshortener/internal/config/db"
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 )
 
 // StartupFlagsParser provide interface for app flags.
@@ -17,16 +17,16 @@ type StartupFlagsParser interface {
 	GetTimeout() time.Duration
 	GetLogLevel() string
 	GetLocalStorage() string
-	GetDatabaseDSN() string
+	GetDatabaseConf() dbconf.DBConfigurer
 }
 
 // StartupFlags app startup flags.
 type StartupFlags struct {
-	ServerAddress *Address `env:"SERVER_ADDRESS"`
-	BaseURL       string   `env:"BASE_URL"`
-	LogLevel      string   `env:"LOG_LEVEL"`
-	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
-	DBConf        *db.Conf
+	ServerAddress *Address     `env:"SERVER_ADDRESS"`
+	BaseURL       string       `env:"BASE_URL"`
+	LogLevel      string       `env:"LOG_LEVEL"`
+	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
+	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
 }
 
@@ -64,9 +64,8 @@ func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
 
-// GetDatabaseDSN return DSN string for db.
-func (sf *StartupFlags) GetDatabaseDSN() string {
-	return sf.DBConf.DatabaseDSN
+func (sf *StartupFlags) GetDatabaseConf() dbconf.DBConfigurer {
+	return sf.DBConf
 }
 
 // Address base struct.
