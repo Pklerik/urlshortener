@@ -3,7 +3,6 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
@@ -134,10 +132,6 @@ func TestLinkHandle_PostJson(t *testing.T) {
 }
 
 func TestLinkHandle_PingDB(t *testing.T) {
-	var testConfig = *baseConfig
-	testConfig.DBConf = &dbconf.Conf{}
-	testConfig.DBConf.Set(databaseDSN)
-
 	type fields struct {
 		linkService service.LinkServicer
 		Args        config.StartupFlagsParser
@@ -154,8 +148,8 @@ func TestLinkHandle_PingDB(t *testing.T) {
 	}{
 		{name: "base PING DB",
 			fields: fields{
-				linkService: service.NewLinksService(repository.NewDBLinksRepository(context.TODO(), &testConfig)),
-				Args:        &testConfig},
+				linkService: service.NewLinksService(repository.NewLocalMemoryLinksRepository(baseConfig.LocalStorage)),
+				Args:        baseConfig},
 			args: args{
 				w: httptest.NewRecorder(),
 				r: httptest.NewRequest("GET", "/ping", nil)}},
