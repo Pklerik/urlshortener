@@ -207,7 +207,6 @@ func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupF
 // DBLinksRepository provide base struct for db implementation.
 type DBLinksRepository struct {
 	db *sql.DB
-	mu sync.RWMutex
 }
 
 // NewDBLinksRepository - provide new instance DBLinksRepository.
@@ -277,12 +276,13 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 		ld  model.LinkData
 		err error
 	)
+
 	ld, err = r.getShort(ctx, linkData.ShortURL)
 	if err == nil {
 		return ld, nil
 	}
 
-	if err != sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return ld, fmt.Errorf("crate error: %w", err)
 	}
 
@@ -295,9 +295,12 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 	if err != nil {
 		return linkData, fmt.Errorf("error inserting data to db: %w", err)
 	}
+
 	logger.Sugar.Infof("ld inserted: %s", linkData)
 
-	tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return linkData, fmt.Errorf("committing insertion error: %w", err)
+	}
 
 	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
 		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
@@ -313,11 +316,13 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 		ld  model.LinkData
 		err error
 	)
+
 	ld, err = r.getShort(ctx, short)
 	if err != nil {
-		if err != sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ld, fmt.Errorf("crate error: %w", err)
 		}
+
 		return ld, ErrNotFoundLink
 	}
 
@@ -335,7 +340,6 @@ func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsPa
 }
 
 func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.LinkData, error) {
-
 	linkData := model.LinkData{}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -344,12 +348,15 @@ func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.L
 	}
 
 	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
+
 	err = row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return linkData, sql.ErrNoRows
 		}
+
 		logger.Sugar.Errorf("error selecting db data: %w", err)
+
 		return linkData, fmt.Errorf("error selecting db data: %w", err)
 	}
 
