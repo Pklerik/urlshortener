@@ -1,12 +1,10 @@
-// Package db provide database configurations.
+// Package dbconf provide database configurations.
 package dbconf
 
 import (
 	"errors"
 	"fmt"
 	"strings"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var (
@@ -14,16 +12,19 @@ var (
 	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
 	// ErrIncorrectDatabaseURL database URL is incorrect, please use mask: postgresql://[user[:password]@][host][:port]/[database][?parameters].
 	ErrIncorrectDatabaseURL = errors.New("database URL is incorrect, please use mask: postgresql://[user[:password]@][host][:port]/[database][?parameters]")
-	// ErrNotImplemented DBConfigurer instance is not implemented
+	// ErrNotImplemented DBConfigurer instance is not implemented.
 	ErrNotImplemented = errors.New("DBConfigurer instance is not implemented")
 )
 
 var (
-	Default_GOOSE_DRIVER = "postgres"
+	// DefaultGooseDrier - default driver if not presented.
+	DefaultGooseDrier = "postgres"
 )
 
+// Options is alias for db config options.
 type Options map[string]string
 
+// DBConfigurer provide methods for db configuration.
 type DBConfigurer interface {
 	String() string
 	UnmarshalText(text []byte) error
@@ -62,10 +63,12 @@ func (dbc *Conf) String() string {
 }
 
 // Set parse Conf from string.
+// nolint
 func (dbc *Conf) Set(s string) error {
 	if len(s) == 0 {
 		return nil
 	}
+
 	dialectIdx := strings.Index(s, "://")
 	if dialectIdx == -1 {
 		return ErrIncorrectDatabaseURL
@@ -75,6 +78,7 @@ func (dbc *Conf) Set(s string) error {
 	if userIdx == -1 {
 		return ErrIncorrectDatabaseURL
 	}
+
 	userIdx += dialectIdx + 3
 	dbc.User = s[dialectIdx+3 : userIdx]
 
@@ -82,6 +86,7 @@ func (dbc *Conf) Set(s string) error {
 	if passwordIdx == -1 {
 		return ErrIncorrectDatabaseURL
 	}
+
 	passwordIdx += userIdx
 	dbc.Password = s[userIdx+1 : passwordIdx]
 
@@ -89,6 +94,7 @@ func (dbc *Conf) Set(s string) error {
 	if hostIdx == -1 {
 		return ErrIncorrectDatabaseURL
 	}
+
 	hostIdx += passwordIdx
 	dbc.Host = s[passwordIdx+1 : hostIdx]
 
@@ -96,6 +102,7 @@ func (dbc *Conf) Set(s string) error {
 	if portIdx == -1 {
 		return ErrIncorrectDatabaseURL
 	}
+
 	portIdx += hostIdx
 	if len(s[hostIdx+1:portIdx]) > 0 {
 		dbc.Port = s[hostIdx+1 : portIdx]
@@ -108,6 +115,7 @@ func (dbc *Conf) Set(s string) error {
 		dbc.Database = s[portIdx+1:]
 		return nil
 	}
+
 	connOptionsIdx += portIdx
 	dbc.Database = s[portIdx+1 : connOptionsIdx]
 
@@ -116,13 +124,16 @@ func (dbc *Conf) Set(s string) error {
 		dbc.Options = make(Options, 0)
 		return nil
 	}
+
 	dbc.Options = make(Options, len(connOptions)-1)
 	for i := 1; i < len(connOptions); i++ {
 		var name, value string
+
 		name = strings.Split(connOptions[i], "=")[0]
 		if len(strings.Split(connOptions[i], "=")) > 1 {
 			value = strings.Split(connOptions[i], "=")[1]
 		}
+
 		dbc.Options[name] = value
 	}
 
@@ -133,36 +144,44 @@ func (dbc *Conf) Set(s string) error {
 	return nil
 }
 
+// SetDefault provide default vals for options.
 func (dbc *Conf) SetDefault() error {
-
 	if _, ok := dbc.Options["search_path"]; !ok {
 		dbc.Options["search_path"] = "shortener"
 	}
+
 	if _, ok := dbc.Options["sslmode"]; !ok {
 		dbc.Options["sslmode"] = "disable"
 	}
+
 	return nil
 }
 
+// GetConnString provide coonection string for db.
 func (dbc *Conf) GetConnString() string {
 	ps := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s", dbc.User, dbc.Password, dbc.Database, dbc.Host, dbc.Port)
 	if dbc.Options == nil {
 		return ps
 	}
+
 	for name, value := range dbc.Options {
 		ps += fmt.Sprintf(" %s=%s", name, value)
 	}
+
 	return ps
 }
 
+// GetUser returns user.
 func (dbc *Conf) GetUser() string {
 	return dbc.User
 }
 
+// GetOptions return Options.
 func (dbc *Conf) GetOptions() Options {
 	return dbc.Options
 }
 
+// Valid return is (dbc *Conf) is valid config.
 func (dbc *Conf) Valid() bool {
 	switch {
 	case dbc.User == "":

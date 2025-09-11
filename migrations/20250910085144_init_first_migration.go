@@ -19,7 +19,6 @@ func upInitFirstMigration(ctx context.Context, tx *sql.Tx) error {
 			short_url VARCHAR(10),
 			long_url VARCHAR(255));`)
 	if err != nil {
-
 		return fmt.Errorf("up create table error: %w", err)
 	}
 
@@ -37,5 +36,6 @@ func downInitFirstMigration(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("down drop schema error: %w", err)
 	}
+
 	return nil
 }

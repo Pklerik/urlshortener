@@ -30,6 +30,8 @@ var (
 	ErrExistingURL = errors.New("can't crate record with existing shortURL")
 	// ErrEmptyDatabaseDSN - DatabaseDSN is empty.
 	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
+	// ErrCollectingDBConf - unable to collect DB conf.
+	ErrCollectingDBConf = errors.New("unable to collect DB conf")
 )
 
 // LinksStorager - interface for shortener service.
@@ -202,12 +204,13 @@ func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupF
 	return nil
 }
 
+// DBLinksRepository provide base struct for db implementation.
 type DBLinksRepository struct {
 	db *sql.DB
 	mu sync.RWMutex
 }
 
-// NewDBLinksRepository - provide new instance DBLinksRepository
+// NewDBLinksRepository - provide new instance DBLinksRepository.
 func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsParser) *DBLinksRepository {
 	db, err := ConnectDB(parsedArgs)
 	if err != nil {
@@ -221,47 +224,51 @@ func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsPar
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
 	}
+
 	return &DBLinksRepository{
 		db: db,
 	}
 }
 
-// ConncetDB connecting to DB.
+// ConnectDB connecting to DB.
 func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 	if os.Getenv("GOOSE_DRIVER") == "" {
-		if err := os.Setenv("GOOSE_DRIVER", dbconf.Default_GOOSE_DRIVER); err != nil {
+		if err := os.Setenv("GOOSE_DRIVER", dbconf.DefaultGooseDrier); err != nil {
 			return nil, fmt.Errorf("cant set env variable: %w", err)
 		}
 	}
+
 	if os.Getenv("GOOSE_DBSTRING") == "" {
 		if err := os.Setenv("GOOSE_DBSTRING", parsedArgs.GetDatabaseConf().GetConnString()); err != nil {
 			return nil, fmt.Errorf("cant set env variable: %w", err)
 		}
 	}
+
 	if os.Getenv("GOOSE_MIGRATION_DIR") == "" {
 		dir := filepath.Join(dictionary.BasePath, "migrations")
 		if err := os.Setenv("GOOSE_MIGRATION_DIR", dir); err != nil {
 			return nil, fmt.Errorf("cant set env variable: %w", err)
 		}
 	}
+
 	dbConf := parsedArgs.GetDatabaseConf()
 	logger.Sugar.Infof("ConnString: Database: %s, User: %s",
 		dbConf.(*dbconf.Conf).Database,
 		dbConf.(*dbconf.Conf).User,
 	)
+
 	if dbConf == nil {
-		return nil, fmt.Errorf("unable to collect DB conf")
+		return nil, ErrCollectingDBConf
 	}
 
 	ps := dbConf.GetConnString()
-	db, err := sql.Open("pgx", ps)
 
+	db, err := sql.Open("pgx", ps)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to DB: %w", err)
 	}
 
 	return db, nil
-
 }
 
 // Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
@@ -278,10 +285,12 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 	if err != nil {
 		return linkData, fmt.Errorf("error creating tx error: %w", err)
 	}
+
 	res, err := tx.ExecContext(ctx, "INSERT INTO shortener.links (uuid, short_url, long_url) VALUES($1, $2, $3)", ld.UUID, ld.ShortURL, ld.LongURL)
 	if err != nil {
 		return linkData, fmt.Errorf("error inserting data to db: %w", err)
 	}
+
 	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
 		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
 	}
@@ -309,6 +318,7 @@ func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsPa
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
 	}
+
 	return nil
 }
 
@@ -317,15 +327,19 @@ func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.L
 	defer r.mu.RUnlock()
 
 	linkData := model.LinkData{}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return linkData, fmt.Errorf("error creating tx error: %w", err)
 	}
+
 	row := tx.QueryRowContext(ctx, "SELECT uuid, short_url, long_url FROM shortener.links WHERE short_url LIKE $1", short)
 	if err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL); err != nil {
 		logger.Sugar.Errorf("error selecting db data: %w", err)
 		return linkData, fmt.Errorf("error selecting db data: %w", err)
 	}
+
 	logger.Sugar.Debugf("error selecting db data: %v", linkData)
+
 	return linkData, nil
 }

@@ -19,6 +19,7 @@ import (
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) http.Handler {
 	var linksRepo repository.LinksStorager
+
 	switch {
 	case parsedFlags.GetDatabaseConf() != nil:
 		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
@@ -27,6 +28,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	default:
 		linksRepo = repository.NewInMemoryLinksRepository()
 	}
+
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()

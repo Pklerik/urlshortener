@@ -1,3 +1,4 @@
+// Package config provide all app configs.
 package config
 
 import (
@@ -64,13 +65,16 @@ func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
 
+// GetDatabaseConf returns pointer to dbconf.DBConfigurer or nil.
 func (sf *StartupFlags) GetDatabaseConf() dbconf.DBConfigurer {
 	if sf.DBConf == nil {
 		return nil
 	}
+
 	if !sf.DBConf.Valid() {
 		return nil
 	}
+
 	return sf.DBConf
 }
 
