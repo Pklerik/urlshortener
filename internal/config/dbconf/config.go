@@ -147,12 +147,12 @@ func (dbc *Conf) Set(s string) error {
 // SetDefault provide default vals for options.
 func (dbc *Conf) SetDefault() error {
 	if _, ok := dbc.Options["search_path"]; !ok {
-		dbc.Options["search_path"] = "shortener"
+		dbc.Options["search_path"] = "public"
 	}
 
-	if _, ok := dbc.Options["sslmode"]; !ok {
-		dbc.Options["sslmode"] = "disable"
-	}
+	// if _, ok := dbc.Options["sslmode"]; !ok {
+	// 	dbc.Options["sslmode"] = ""
+	// }
 
 	return nil
 }

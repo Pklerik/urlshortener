@@ -29,6 +29,7 @@ func MakeMigrations(ctx context.Context, db *sql.DB, dbConf dbconf.DBConfigurer)
 
 	scheme := dbConf.GetOptions()["search_path"]
 	query := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s;", scheme, dbConf.GetUser())
+	logger.Sugar.Infof("scheme: %s", scheme)
 
 	_, err = tx.ExecContext(ctx, query)
 	if err != nil {

@@ -216,7 +216,6 @@ func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsPar
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
 	}
-	defer db.Close()
 
 	logger.Sugar.Infof("SUCCESS connecting to db: %v", db.Stats())
 
@@ -252,9 +251,10 @@ func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 	}
 
 	dbConf := parsedArgs.GetDatabaseConf()
-	logger.Sugar.Infof("ConnString: Database: %s, User: %s",
+	logger.Sugar.Infof("ConnString: Database: %s, User: %s, Options: %v",
 		dbConf.(*dbconf.Conf).Database,
 		dbConf.(*dbconf.Conf).User,
+		dbConf.(*dbconf.Conf).Options,
 	)
 
 	if dbConf == nil {
@@ -277,8 +277,13 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 		ld  model.LinkData
 		err error
 	)
-	if ld, err = r.getShort(ctx, linkData.ShortURL); err != nil {
-		return ld, ErrExistingURL
+	ld, err = r.getShort(ctx, linkData.ShortURL)
+	if err == nil {
+		return ld, nil
+	}
+
+	if err != sql.ErrNoRows {
+		return ld, fmt.Errorf("crate error: %w", err)
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -286,10 +291,13 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 		return linkData, fmt.Errorf("error creating tx error: %w", err)
 	}
 
-	res, err := tx.ExecContext(ctx, "INSERT INTO shortener.links (uuid, short_url, long_url) VALUES($1, $2, $3)", ld.UUID, ld.ShortURL, ld.LongURL)
+	res, err := tx.ExecContext(ctx, "INSERT INTO links (id, short_url, long_url) VALUES($1, $2, $3)", linkData.UUID, linkData.ShortURL, linkData.LongURL)
 	if err != nil {
 		return linkData, fmt.Errorf("error inserting data to db: %w", err)
 	}
+	logger.Sugar.Infof("ld inserted: %s", linkData)
+
+	tx.Commit()
 
 	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
 		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
@@ -305,8 +313,12 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 		ld  model.LinkData
 		err error
 	)
-	if ld, err = r.getShort(ctx, short); err != nil {
-		return ld, ErrExistingURL
+	ld, err = r.getShort(ctx, short)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return ld, fmt.Errorf("crate error: %w", err)
+		}
+		return ld, ErrNotFoundLink
 	}
 
 	return ld, nil
@@ -323,8 +335,6 @@ func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsPa
 }
 
 func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.LinkData, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 
 	linkData := model.LinkData{}
 
@@ -333,13 +343,17 @@ func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.L
 		return linkData, fmt.Errorf("error creating tx error: %w", err)
 	}
 
-	row := tx.QueryRowContext(ctx, "SELECT uuid, short_url, long_url FROM shortener.links WHERE short_url LIKE $1", short)
-	if err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL); err != nil {
+	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
+	err = row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return linkData, sql.ErrNoRows
+		}
 		logger.Sugar.Errorf("error selecting db data: %w", err)
 		return linkData, fmt.Errorf("error selecting db data: %w", err)
 	}
 
-	logger.Sugar.Debugf("error selecting db data: %v", linkData)
+	logger.Sugar.Infof("LD selected: %v", linkData)
 
 	return linkData, nil
 }

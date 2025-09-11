@@ -87,7 +87,7 @@ func (ls *BaseLinkService) checkCollision(ctx context.Context, shortURL, longURL
 		return nil
 	}
 
-	if err != nil {
+	if err != nil && err != repository.ErrExistingURL {
 		return fmt.Errorf("(ls *BaseLinkService) collisionCheck: %w", err)
 	}
 
