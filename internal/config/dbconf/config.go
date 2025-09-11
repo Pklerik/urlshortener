@@ -32,6 +32,7 @@ type DBConfigurer interface {
 	GetConnString() string
 	GetOptions() Options
 	GetUser() string
+	Valid() bool
 }
 
 // Conf contain attrs for DB configuration.
@@ -160,4 +161,17 @@ func (dbc *Conf) GetUser() string {
 
 func (dbc *Conf) GetOptions() Options {
 	return dbc.Options
+}
+
+func (dbc *Conf) Valid() bool {
+	switch {
+	case dbc.User == "":
+		return false
+	case dbc.Database == "":
+		return false
+	case dbc.Host == "":
+		return false
+	default:
+		return true
+	}
 }

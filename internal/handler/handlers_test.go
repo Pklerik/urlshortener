@@ -3,10 +3,13 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/joho/godotenv"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
@@ -16,11 +19,16 @@ import (
 )
 
 var (
-	baseConfig = &config.StartupFlags{LocalStorage: "local_storage.json", LogLevel: "DEBUG"}
+	baseConfig  = &config.StartupFlags{LocalStorage: "local_storage.json", LogLevel: "DEBUG"}
+	databaseDSN string
 )
 
 func init() {
 	logger.Initialize(baseConfig.GetLogLevel())
+	if err := godotenv.Load("../../.env"); err != nil {
+		logger.Log.Fatal("Unable to load .env")
+	}
+	databaseDSN = os.Getenv("DATABASE_DSN")
 }
 
 func TestLinkHandle_Get(t *testing.T) {
@@ -126,6 +134,10 @@ func TestLinkHandle_PostJson(t *testing.T) {
 }
 
 func TestLinkHandle_PingDB(t *testing.T) {
+	var testConfig = *baseConfig
+	testConfig.DBConf = &dbconf.Conf{}
+	testConfig.DBConf.Set(databaseDSN)
+
 	type fields struct {
 		linkService service.LinkServicer
 		Args        config.StartupFlagsParser
@@ -142,8 +154,8 @@ func TestLinkHandle_PingDB(t *testing.T) {
 	}{
 		{name: "base PING DB",
 			fields: fields{
-				linkService: service.NewLinksService(repository.NewLocalMemoryLinksRepository(baseConfig.GetLocalStorage())),
-				Args:        &config.StartupFlags{DBConf: &dbconf.Conf{DatabaseDSN: os.Getenv("DATABASE_DSN")}}},
+				linkService: service.NewLinksService(repository.NewDBLinksRepository(context.TODO(), &testConfig)),
+				Args:        &testConfig},
 			args: args{
 				w: httptest.NewRecorder(),
 				r: httptest.NewRequest("GET", "/ping", nil)}},

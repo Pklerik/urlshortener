@@ -19,15 +19,13 @@ func upInitFirstMigration(ctx context.Context, tx *sql.Tx) error {
 			short_url VARCHAR(10),
 			long_url VARCHAR(255));`)
 	if err != nil {
-		tx.Rollback()
+
 		return fmt.Errorf("up create table error: %w", err)
 	}
 
 	_, _ = tx.ExecContext(ctx,
 		`INSERT INTO shortener.links (id, short_url,long_url)
 		 VALUES ('019906ca-14b2-7589-b77d-32e3fe12402a', '398f0ca4', 'http://ya.ru')`)
-
-	tx.Commit()
 
 	return nil
 }

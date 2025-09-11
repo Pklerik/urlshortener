@@ -2,7 +2,7 @@
 package router
 
 import (
-	"database/sql"
+	"context"
 	"net/http"
 
 	//nolint
@@ -17,11 +17,11 @@ import (
 )
 
 // ConfigureRouter starts server with base configuration.
-func ConfigureRouter(parsedFlags config.StartupFlagsParser, db *sql.DB) http.Handler {
+func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) http.Handler {
 	var linksRepo repository.LinksStorager
 	switch {
-	case db != nil:
-		linksRepo = repository.NewDBLinksRepository(db)
+	case parsedFlags.GetDatabaseConf() != nil:
+		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
 	case parsedFlags.GetLocalStorage() != "":
 		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	default:

@@ -16,9 +16,11 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
+	"github.com/Pklerik/urlshortener/migrations"
 )
 
 var (
@@ -196,18 +198,7 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 }
 
 // PingDB returns ping info from db.
-func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
-	ps := args.GetDatabaseConf().GetConnString()
-	if ps == "" {
-		return ErrEmptyDatabaseDSN
-	}
-
-	db, err := sql.Open("pgx", args.GetDatabaseConf().GetConnString())
-	if err != nil {
-		return fmt.Errorf("unable to connect to DB: %w", err)
-	}
-	defer db.Close()
-
+func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
 	return nil
 }
 
@@ -217,10 +208,60 @@ type DBLinksRepository struct {
 }
 
 // NewDBLinksRepository - provide new instance DBLinksRepository
-func NewDBLinksRepository(db *sql.DB) *DBLinksRepository {
+func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsParser) *DBLinksRepository {
+	db, err := ConnectDB(parsedArgs)
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
+	defer db.Close()
+
+	logger.Sugar.Infof("SUCCESS connecting to db: %v", db.Stats())
+
+	err = migrations.MakeMigrations(ctx, db, parsedArgs.GetDatabaseConf())
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
 	return &DBLinksRepository{
 		db: db,
 	}
+}
+
+// ConncetDB connecting to DB.
+func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
+	if os.Getenv("GOOSE_DRIVER") == "" {
+		if err := os.Setenv("GOOSE_DRIVER", dbconf.Default_GOOSE_DRIVER); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+	if os.Getenv("GOOSE_DBSTRING") == "" {
+		if err := os.Setenv("GOOSE_DBSTRING", parsedArgs.GetDatabaseConf().GetConnString()); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+	if os.Getenv("GOOSE_MIGRATION_DIR") == "" {
+		dir := filepath.Join(dictionary.BasePath, "migrations")
+		if err := os.Setenv("GOOSE_MIGRATION_DIR", dir); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+	dbConf := parsedArgs.GetDatabaseConf()
+	logger.Sugar.Infof("ConnString: Database: %s, User: %s",
+		dbConf.(*dbconf.Conf).Database,
+		dbConf.(*dbconf.Conf).User,
+	)
+	if dbConf == nil {
+		return nil, fmt.Errorf("unable to collect DB conf")
+	}
+
+	ps := dbConf.GetConnString()
+	db, err := sql.Open("pgx", ps)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to DB: %w", err)
+	}
+
+	return db, nil
+
 }
 
 // Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
@@ -263,7 +304,11 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 }
 
 // PingDB returns nil every time.
-func (r *DBLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
+	_, err := ConnectDB(args)
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
 	return nil
 }
 
@@ -278,7 +323,9 @@ func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.L
 	}
 	row := tx.QueryRowContext(ctx, "SELECT uuid, short_url, long_url FROM shortener.links WHERE short_url LIKE $1", short)
 	if err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL); err != nil {
+		logger.Sugar.Errorf("error selecting db data: %w", err)
 		return linkData, fmt.Errorf("error selecting db data: %w", err)
 	}
+	logger.Sugar.Debugf("error selecting db data: %v", linkData)
 	return linkData, nil
 }

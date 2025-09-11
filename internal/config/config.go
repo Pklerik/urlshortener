@@ -65,6 +65,12 @@ func (sf *StartupFlags) GetLocalStorage() string {
 }
 
 func (sf *StartupFlags) GetDatabaseConf() dbconf.DBConfigurer {
+	if sf.DBConf == nil {
+		return nil
+	}
+	if !sf.DBConf.Valid() {
+		return nil
+	}
 	return sf.DBConf
 }
 

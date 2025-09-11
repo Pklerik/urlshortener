@@ -3,7 +3,6 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,16 +14,11 @@ import (
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/router"
-	"github.com/Pklerik/urlshortener/migrations"
 	"golang.org/x/sync/errgroup"
 )
 
 // StartApp - starts server app function.
 func StartApp(parsedArgs config.StartupFlagsParser) {
-	var (
-		db  *sql.DB
-		err error
-	)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -35,25 +29,11 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 		cancel()
 	}()
 
-	db, err = ConnectDB(parsedArgs)
-	if err != nil {
-		logger.Sugar.Errorf("Cant connect to db server: %w", err)
-	}
-	defer db.Close()
-
-	logger.Sugar.Infof("SUCCESS connecting to db: %v", db.Stats())
-
-	err = migrations.MakeMigrations(ctx, db, parsedArgs.GetDatabaseConf())
-	if err != nil {
-		logger.Sugar.Errorf("Cant connect to db server: %w", err)
-		return
-	}
-
 	argPort := ":" + strconv.Itoa(parsedArgs.GetServerAddress().Port)
 	logger.Sugar.Infof("Setup server with args: port: %s", argPort)
 	httpServer := &http.Server{
 		Addr:         argPort,
-		Handler:      router.ConfigureRouter(parsedArgs, db),
+		Handler:      router.ConfigureRouter(ctx, parsedArgs),
 		ReadTimeout:  parsedArgs.GetTimeout(),
 		WriteTimeout: parsedArgs.GetTimeout(),
 	}
