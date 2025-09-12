@@ -133,11 +133,13 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	if len(lds) > 1 {
 		http.Error(w, "Not implemented multiple response", http.StatusInternalServerError)
 
 		return
 	}
+
 	resp := model.Response{
 		Result: lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL,
 	}
@@ -174,16 +176,15 @@ func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// PostBatchJSON provide json batch POST new links realization.
 func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	err := validators.ApplicationJSON(w, r)
 	if err != nil {
 		return
 	}
-
 	var req []model.ReqPostBatch
 
 	defer r.Body.Close()
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Log.Debug("cannot read body", zap.Error(err))
@@ -201,7 +202,9 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	logger.Sugar.Infof("req struct for batch: %s", req)
+
 	reqLongUrls := make([]string, 0, len(req))
 	for _, reqElem := range req {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
@@ -214,6 +217,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	resp := make([]model.ResPostBatch, 0, len(lds))
 	for i, linkData := range lds {
 		resp = append(resp, model.ResPostBatch{

@@ -41,7 +41,7 @@ func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
 	return &BaseLinkService{linksRepo: repo}
 }
 
-// RegisterLink - register the Link with provided longURL.
+// RegisterLinks - register the Link with provided longURL.
 func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error) {
 	logger.Sugar.Infof("Long urls to short: %v", longURLs)
 	lds := make([]model.LinkData, 0, len(longURLs))
@@ -51,6 +51,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 		if err != nil {
 			return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 		}
+
 		lds = append(lds, model.LinkData{
 			UUID:     model.LinkUUIDv7(uuidv7.New().String()),
 			ShortURL: shortURL,
@@ -59,7 +60,6 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 	}
 
 	lds, err := ls.linksRepo.Create(ctx, lds)
-
 	if err != nil {
 		return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
@@ -85,7 +85,6 @@ func (ls *BaseLinkService) cutURL(_ context.Context, longURL string) (string, er
 // checkCollision makes sure that link doesn't have long representation already.
 func (ls *BaseLinkService) checkCollision(ctx context.Context, shortURL, longURL string) error {
 	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
-
 	if err != nil {
 		return fmt.Errorf("(ls *BaseLinkService) collisionCheck: %w", err)
 	}

@@ -63,9 +63,11 @@ func (r *InMemoryLinksRepository) Create(_ context.Context, links []model.LinkDa
 		if _, ok := r.Shorts[linkData.ShortURL]; ok {
 			continue
 		}
+
 		r.Shorts[linkData.ShortURL] = &linkData
 		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 	}
+
 	return links, nil
 }
 
@@ -104,11 +106,13 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 
 	filePath = filepath.Clean(filePath)
 
-	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0664)
+	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
 		logger.Sugar.Fatalf("error creating storage file: %w", err)
 	}
+
 	logger.Sugar.Info("Creating file by path: %s", filePath)
+
 	return &LocalMemoryLinksRepository{
 		File: filePath,
 	}
@@ -120,14 +124,17 @@ func (r *LocalMemoryLinksRepository) Create(_ context.Context, links []model.Lin
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
+
 	for _, linkData := range links {
 		_, ok := slContains(linkData.ShortURL, slStorage)
 		if ok {
 			continue
 		}
+
 		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 		slStorage = append(slStorage, linkData)
 	}
+
 	if err := r.Write(slStorage); err != nil {
 		logger.Sugar.Errorf("unable to crate record: %w", err)
 		return links, fmt.Errorf("unable to crate record: %w", err)
@@ -276,21 +283,25 @@ func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
 		err         error
-		newLinksIDs []int = make([]int, 0, len(links))
+		newLinksIDs = make([]int, 0, len(links))
 	)
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
 	}
+
 	for i, linkData := range links {
 		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
 		if err != nil {
 			return links, fmt.Errorf("error Create: %w", err)
 		}
+
 		if existingLD == nil {
 			newLinksIDs = append(newLinksIDs, i)
 		}
 	}
+
 	if len(newLinksIDs) == 0 {
 		return links, nil
 	}
@@ -304,12 +315,14 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 		if err != nil {
 			return links, fmt.Errorf("error inserting data to db: %w", err)
 		}
+
 		if rows, err := res.RowsAffected(); err != nil || rows != 1 {
 			return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
 		}
-		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 
+		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 	}
+
 	if err := tx.Commit(); err != nil {
 		return links, fmt.Errorf("committing insertion error: %w", err)
 	}
@@ -321,9 +334,10 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 // If shortURL is absent returns ErrNotFoundLink.
 func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
 	var (
-		ld  *model.LinkData = new(model.LinkData)
+		ld  = new(model.LinkData)
 		err error
 	)
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return *ld, fmt.Errorf("error creating tx error: %w", err)
@@ -359,6 +373,7 @@ func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short stri
 
 			return nil, fmt.Errorf("error selecting db data: %w", err)
 		}
+
 		return nil, nil
 	}
 

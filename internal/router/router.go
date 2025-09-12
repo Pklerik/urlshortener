@@ -24,12 +24,15 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	switch {
 	case parsedFlags.GetDatabaseConf() != nil:
 		logger.Sugar.Info("Use DB realization")
+
 		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
 	case parsedFlags.GetLocalStorage() != "":
 		logger.Sugar.Info("Use File realization")
+
 		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	default:
 		logger.Sugar.Info("Use InMemory realization")
+
 		linksRepo = repository.NewInMemoryLinksRepository()
 	}
 
