@@ -24,3 +24,9 @@ vendor/
 
 # data storage
 local_storage*
+
+# local variables
+.env
+
+# DS_Store
+.DS_Store

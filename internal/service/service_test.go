@@ -7,38 +7,39 @@ import (
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
-	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
 
-func TestBaseLinkService_RegisterLink(t *testing.T) {
+func TestBaseLinkService_RegisterLinks(t *testing.T) {
 	logger.Initialize("DEBUG")
 	type fields struct {
 		linksRepo repository.LinksStorager
 	}
 	type args struct {
-		ctx     context.Context
-		longURL string
+		ctx      context.Context
+		longURLs []string
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
-		want    model.LinkData
+		want    string
 		wantErr bool
 	}{
-		{name: "Base", fields: fields{linksRepo: repository.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURL: "http://ya.ru"}, want: model.LinkData{ShortURL: "398f0ca4"}, wantErr: false},
+		{name: "Base", fields: fields{linksRepo: repository.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ls := NewLinksService(tt.fields.linksRepo)
-			got, err := ls.RegisterLink(tt.args.ctx, tt.args.longURL)
+			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("BaseLinkService.RegisterLink() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("BaseLinkService.RegisterLinks() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got.ShortURL, tt.want.ShortURL) {
-				t.Errorf("BaseLinkService.RegisterLink() = %v, want %v", got, tt.want)
+			for _, got := range gots {
+				if !reflect.DeepEqual(got.ShortURL, tt.want) {
+					t.Errorf("BaseLinkService.RegisterLinks() = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}
