@@ -282,7 +282,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData)
 		return ld, nil
 	}
 
-	if errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return ld, fmt.Errorf("crate error: %w", err)
 	}
 
