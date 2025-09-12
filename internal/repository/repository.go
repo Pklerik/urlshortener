@@ -319,7 +319,7 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 
 	ld, err = r.getShort(ctx, short)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return ld, fmt.Errorf("crate error: %w", err)
 		}
 
