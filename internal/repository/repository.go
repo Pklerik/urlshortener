@@ -31,6 +31,8 @@ var (
 	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
 	// ErrCollectingDBConf - unable to collect DB conf.
 	ErrCollectingDBConf = errors.New("unable to collect DB conf")
+	// ErrExistingLink - link already in exist.
+	ErrExistingLink = errors.New("link already in exist")
 )
 
 // LinksStorager - interface for shortener service.
@@ -293,6 +295,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 
 	for i, linkData := range links {
 		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
+
 		if err != nil {
 			return links, fmt.Errorf("error Create: %w", err)
 		}
@@ -303,7 +306,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 	}
 
 	if len(newLinksIDs) == 0 {
-		return links, nil
+		return links, ErrExistingLink
 	}
 
 	for i, linkData := range links {
@@ -327,11 +330,14 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 		return links, fmt.Errorf("committing insertion error: %w", err)
 	}
 
+	if len(newLinksIDs) != len(links) {
+		return links, ErrExistingLink
+	}
 	return links, nil
 }
 
 // FindShort - provide model.LinkData and error
-// If shortURL is absent returns ErrNotFoundLink.
+// If shortURL is absent returns nil.
 func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
 	var (
 		ld  = new(model.LinkData)

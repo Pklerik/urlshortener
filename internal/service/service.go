@@ -60,8 +60,11 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 	}
 
 	lds, err := ls.linksRepo.Create(ctx, lds)
-	if err != nil {
+	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
+	}
+	if errors.Is(err, repository.ErrExistingLink) {
+		return lds, repository.ErrExistingLink
 	}
 
 	return lds, nil

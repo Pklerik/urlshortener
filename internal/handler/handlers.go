@@ -4,6 +4,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
+	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
@@ -75,14 +77,18 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{string(body)})
-	if err != nil {
+	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 
 		return
 	}
-
-	w.WriteHeader(http.StatusCreated)
+	if errors.Is(err, repository.ErrExistingLink) {
+		logger.Sugar.Infof(`Found existing urls: status: %d`, http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 
 	redirectURL := lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL
 
@@ -127,11 +133,19 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{req.URL})
-	if err != nil {
+	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 
 		return
+	}
+	if errors.Is(err, repository.ErrExistingLink) {
+		logger.Sugar.Infof(`Found existing urls: status: %d`, http.StatusConflict)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	if len(lds) > 1 {
@@ -143,9 +157,6 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	resp := model.Response{
 		Result: lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	enc := json.NewEncoder(w)
 	logger.Sugar.Debugf("Head: %v", w.Header())
