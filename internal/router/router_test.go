@@ -34,7 +34,7 @@ func TestRegisterLinkHandler(t *testing.T) {
 
 	r := ConfigureRouter(context.TODO(), &config.StartupFlags{
 		BaseURL:      redirectHost,
-		LocalStorage: "../../local_storage.json",
+		LocalStorage: "../local_storage.json",
 		DBConf:       nil,
 	})
 	srv := httptest.NewServer(r)

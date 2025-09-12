@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"slices"
 
 	"errors"
 	"fmt"
@@ -26,8 +27,6 @@ import (
 var (
 	// ErrNotFoundLink - link was not found.
 	ErrNotFoundLink = errors.New("link was not found")
-	// ErrExistingURL - can't crate record with existing shortURL.
-	ErrExistingURL = errors.New("can't crate record with existing shortURL")
 	// ErrEmptyDatabaseDSN - DatabaseDSN is empty.
 	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
 	// ErrCollectingDBConf - unable to collect DB conf.
@@ -36,7 +35,7 @@ var (
 
 // LinksStorager - interface for shortener service.
 type LinksStorager interface {
-	Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error)
+	Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
 	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
@@ -56,17 +55,18 @@ func NewInMemoryLinksRepository() *InMemoryLinksRepository {
 }
 
 // Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
-func (r *InMemoryLinksRepository) Create(_ context.Context, linkData model.LinkData) (model.LinkData, error) {
+func (r *InMemoryLinksRepository) Create(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if ld, ok := r.Shorts[linkData.ShortURL]; ok {
-		return *ld, ErrExistingURL
+	for _, linkData := range links {
+		if _, ok := r.Shorts[linkData.ShortURL]; ok {
+			continue
+		}
+		r.Shorts[linkData.ShortURL] = &linkData
+		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 	}
-
-	r.Shorts[linkData.ShortURL] = &linkData
-
-	return linkData, nil
+	return links, nil
 }
 
 // FindShort - provide model.LinkData and error
@@ -104,34 +104,36 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 
 	filePath = filepath.Clean(filePath)
 
-	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
+	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0664)
 	if err != nil {
 		logger.Sugar.Fatalf("error creating storage file: %w", err)
 	}
-
+	logger.Sugar.Info("Creating file by path: %s", filePath)
 	return &LocalMemoryLinksRepository{
 		File: filePath,
 	}
 }
 
 // Create - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
-func (r *LocalMemoryLinksRepository) Create(_ context.Context, linkData model.LinkData) (model.LinkData, error) {
+func (r *LocalMemoryLinksRepository) Create(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	slStorage, err := r.Read()
 	if err != nil {
-		return model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
+		return []model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
-
-	ld, ok := slContains(linkData.ShortURL, slStorage)
-	if ok {
-		return ld, nil
+	for _, linkData := range links {
+		_, ok := slContains(linkData.ShortURL, slStorage)
+		if ok {
+			continue
+		}
+		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
+		slStorage = append(slStorage, linkData)
 	}
-
-	slStorage = append(slStorage, linkData)
 	if err := r.Write(slStorage); err != nil {
-		return linkData, fmt.Errorf("unable to crate record: %w", err)
+		logger.Sugar.Errorf("unable to crate record: %w", err)
+		return links, fmt.Errorf("unable to crate record: %w", err)
 	}
 
-	return linkData, nil
+	return links, nil
 }
 
 // FindShort - provide model.LinkData and error
@@ -270,63 +272,69 @@ func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 	return db, nil
 }
 
-// Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
-func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error) {
+// Create - writes linkData pointer to internal DBLinksRepository map Shorts.
+func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
-		ld  model.LinkData
-		err error
+		err         error
+		newLinksIDs []int = make([]int, 0, len(links))
 	)
-
-	ld, err = r.getShort(ctx, linkData.ShortURL)
-	if err == nil {
-		return ld, nil
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) {
-		return ld, fmt.Errorf("crate error: %w", err)
-	}
-
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return linkData, fmt.Errorf("error creating tx error: %w", err)
+		return links, fmt.Errorf("error creating tx error: %w", err)
+	}
+	for i, linkData := range links {
+		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
+		if err != nil {
+			return links, fmt.Errorf("error Create: %w", err)
+		}
+		if existingLD == nil {
+			newLinksIDs = append(newLinksIDs, i)
+		}
+	}
+	if len(newLinksIDs) == 0 {
+		return links, nil
 	}
 
-	res, err := tx.ExecContext(ctx, "INSERT INTO links (id, short_url, long_url) VALUES($1, $2, $3)", linkData.UUID, linkData.ShortURL, linkData.LongURL)
-	if err != nil {
-		return linkData, fmt.Errorf("error inserting data to db: %w", err)
+	for i, linkData := range links {
+		if !slices.Contains(newLinksIDs, i) {
+			continue
+		}
+
+		res, err := tx.ExecContext(ctx, "INSERT INTO links (id, short_url, long_url) VALUES($1, $2, $3)", linkData.UUID, linkData.ShortURL, linkData.LongURL)
+		if err != nil {
+			return links, fmt.Errorf("error inserting data to db: %w", err)
+		}
+		if rows, err := res.RowsAffected(); err != nil || rows != 1 {
+			return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
+		}
+		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
+
 	}
-
-	logger.Sugar.Infof("ld inserted: %s", linkData)
-
 	if err := tx.Commit(); err != nil {
-		return linkData, fmt.Errorf("committing insertion error: %w", err)
+		return links, fmt.Errorf("committing insertion error: %w", err)
 	}
 
-	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
-		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
-	}
-
-	return linkData, nil
+	return links, nil
 }
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns ErrNotFoundLink.
 func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
 	var (
-		ld  model.LinkData
+		ld  *model.LinkData = new(model.LinkData)
 		err error
 	)
-
-	ld, err = r.getShort(ctx, short)
+	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return ld, fmt.Errorf("crate error: %w", err)
-		}
-
-		return ld, ErrNotFoundLink
+		return *ld, fmt.Errorf("error creating tx error: %w", err)
 	}
 
-	return ld, nil
+	ld, err = r.getShort(ctx, tx, short)
+	if err != nil {
+		return *ld, fmt.Errorf("crate error: %w", err)
+	}
+
+	return *ld, nil
 }
 
 // PingDB returns nil every time.
@@ -339,28 +347,22 @@ func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsPa
 	return nil
 }
 
-func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.LinkData, error) {
+func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
 	linkData := model.LinkData{}
-
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return linkData, fmt.Errorf("error creating tx error: %w", err)
-	}
 
 	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
 
-	err = row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+	err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return linkData, sql.ErrNoRows
+		if !errors.Is(err, sql.ErrNoRows) {
+			logger.Sugar.Errorf("error selecting db data: %w", err)
+
+			return nil, fmt.Errorf("error selecting db data: %w", err)
 		}
-
-		logger.Sugar.Errorf("error selecting db data: %w", err)
-
-		return linkData, fmt.Errorf("error selecting db data: %w", err)
+		return nil, nil
 	}
 
-	logger.Sugar.Infof("LD selected: %v", linkData)
+	logger.Sugar.Infof("LD selected: %s", linkData)
 
-	return linkData, nil
+	return &linkData, nil
 }

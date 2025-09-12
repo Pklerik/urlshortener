@@ -10,6 +10,7 @@ import (
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
 	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
@@ -22,10 +23,13 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 
 	switch {
 	case parsedFlags.GetDatabaseConf() != nil:
+		logger.Sugar.Info("Use DB realization")
 		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
 	case parsedFlags.GetLocalStorage() != "":
+		logger.Sugar.Info("Use File realization")
 		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	default:
+		logger.Sugar.Info("Use InMemory realization")
 		linksRepo = repository.NewInMemoryLinksRepository()
 	}
 
@@ -47,7 +51,10 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		r.Get("/{shortURL}", linksHandler.Get)
 		r.Post("/", linksHandler.PostText)
 		r.Route("/api", func(r chi.Router) {
-			r.Post("/shorten", linksHandler.PostJSON)
+			r.Route("/shorten", func(r chi.Router) {
+				r.Post("/", linksHandler.PostJSON)
+				r.Post("/batch", linksHandler.PostBatchJSON)
+			})
 		})
 		r.Get("/ping", linksHandler.PingDB)
 	})

@@ -26,7 +26,7 @@ var (
 
 // LinkServicer provide service contract for link handling.
 type LinkServicer interface {
-	RegisterLink(ctx context.Context, longURL string) (model.LinkData, error)
+	RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error)
 	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
 	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
@@ -42,26 +42,29 @@ func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
 }
 
 // RegisterLink - register the Link with provided longURL.
-func (ls *BaseLinkService) RegisterLink(ctx context.Context, longURL string) (model.LinkData, error) {
-	shortURL, err := ls.cutURL(ctx, longURL)
+func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error) {
+	logger.Sugar.Infof("Long urls to short: %v", longURLs)
+	lds := make([]model.LinkData, 0, len(longURLs))
+
+	for _, longURL := range longURLs {
+		shortURL, err := ls.cutURL(ctx, longURL)
+		if err != nil {
+			return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
+		}
+		lds = append(lds, model.LinkData{
+			UUID:     model.LinkUUIDv7(uuidv7.New().String()),
+			ShortURL: shortURL,
+			LongURL:  longURL,
+		})
+	}
+
+	lds, err := ls.linksRepo.Create(ctx, lds)
+
 	if err != nil {
-		return model.LinkData{}, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
+		return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
 
-	err = ls.checkCollision(ctx, shortURL, longURL)
-	if err != nil {
-		return model.LinkData{}, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
-	}
-
-	ld, err := ls.linksRepo.Create(ctx, model.LinkData{UUID: model.LinkUUIDv7(uuidv7.New().String()), ShortURL: shortURL, LongURL: longURL})
-
-	if err != nil && !errors.Is(err, repository.ErrExistingURL) {
-		return ld, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
-	}
-
-	logger.Sugar.Infof("Short url: %s sets for long: %s", ld.ShortURL, ld.LongURL)
-
-	return ld, nil
+	return lds, nil
 }
 
 // cutURL - provide shortURl based on Long.
@@ -83,11 +86,7 @@ func (ls *BaseLinkService) cutURL(_ context.Context, longURL string) (string, er
 func (ls *BaseLinkService) checkCollision(ctx context.Context, shortURL, longURL string) error {
 	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
 
-	if errors.Is(err, repository.ErrNotFoundLink) {
-		return nil
-	}
-
-	if err != nil && !errors.Is(err, repository.ErrExistingURL) {
+	if err != nil {
 		return fmt.Errorf("(ls *BaseLinkService) collisionCheck: %w", err)
 	}
 

@@ -26,3 +26,15 @@ type Request struct {
 type Response struct {
 	Result string `json:"result"`
 }
+
+// PostBatch provide batch contract.
+type ReqPostBatch struct {
+	CorrelationID string `json:"correlation_id"`
+	LongURL       string `json:"original_url"`
+}
+
+// PostBatch provide batch contract.
+type ResPostBatch struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}

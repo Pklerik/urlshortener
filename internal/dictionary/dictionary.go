@@ -4,7 +4,6 @@ package dictionary
 import (
 	"log"
 	"os"
-	"path/filepath"
 )
 
 const (
@@ -23,5 +22,5 @@ func init() {
 		log.Fatalf("Unable to get PWD: %v", err.Error())
 	}
 
-	BasePath = filepath.Dir(filepath.Dir(configPath))
+	BasePath = configPath
 }

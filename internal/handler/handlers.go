@@ -24,6 +24,7 @@ type LinkHandler interface {
 	PostText(w http.ResponseWriter, r *http.Request)
 	PostJSON(w http.ResponseWriter, r *http.Request)
 	PingDB(w http.ResponseWriter, r *http.Request)
+	PostBatchJSON(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -73,7 +74,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ld, err := lh.linkService.RegisterLink(r.Context(), string(body))
+	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{string(body)})
 	if err != nil {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -83,7 +84,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 
-	redirectURL := lh.Args.GetAddressShortURL() + "/" + ld.ShortURL
+	redirectURL := lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL
 
 	_, err = w.Write([]byte(redirectURL))
 	if err != nil {
@@ -93,7 +94,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, ld.LongURL)
+	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, redirectURL, lds[0].LongURL)
 }
 
 // PostJSON returns Handler for URLs registration for GET method.
@@ -125,16 +126,20 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ld, err := lh.linkService.RegisterLink(r.Context(), req.URL)
+	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{req.URL})
 	if err != nil {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 
 		return
 	}
+	if len(lds) > 1 {
+		http.Error(w, "Not implemented multiple response", http.StatusInternalServerError)
 
+		return
+	}
 	resp := model.Response{
-		Result: lh.Args.GetAddressShortURL() + "/" + ld.ShortURL,
+		Result: lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -150,7 +155,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, ld.LongURL)
+	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, lds[0].LongURL)
 }
 
 // PingDB provide 200 for successful database ping.
@@ -167,4 +172,66 @@ func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
+	err := validators.ApplicationJSON(w, r)
+	if err != nil {
+		return
+	}
+
+	var req []model.ReqPostBatch
+
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	reader := io.NopCloser(bytes.NewReader(body))
+
+	dec := json.NewDecoder(reader)
+	if err := dec.Decode(&req); err != nil {
+		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+	logger.Sugar.Infof("req struct for batch: %s", req)
+	reqLongUrls := make([]string, 0, len(req))
+	for _, reqElem := range req {
+		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
+	}
+
+	lds, err := lh.linkService.RegisterLinks(r.Context(), reqLongUrls)
+	if err != nil {
+		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
+		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
+
+		return
+	}
+	resp := make([]model.ResPostBatch, 0, len(lds))
+	for i, linkData := range lds {
+		resp = append(resp, model.ResPostBatch{
+			CorrelationID: req[i].CorrelationID,
+			ShortURL:      lh.Args.GetAddressShortURL() + "/" + linkData.ShortURL,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	enc := json.NewEncoder(w)
+	logger.Sugar.Debugf("Head: %v", w.Header())
+
+	if err := enc.Encode(resp); err != nil {
+		logger.Log.Debug("error encoding response", zap.Error(err))
+		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
+
+		return
+	}
 }

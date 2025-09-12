@@ -113,17 +113,13 @@ func (dbc *Conf) Set(s string) error {
 	connOptionsIdx := strings.Index(s[portIdx:], "?")
 	if connOptionsIdx == -1 {
 		dbc.Database = s[portIdx+1:]
-		return nil
+		connOptionsIdx = portIdx
+	} else {
+		connOptionsIdx += portIdx
+		dbc.Database = s[portIdx+1 : connOptionsIdx]
 	}
-
-	connOptionsIdx += portIdx
-	dbc.Database = s[portIdx+1 : connOptionsIdx]
 
 	connOptions := strings.Split(s[connOptionsIdx+1:], "?")
-	if len(connOptions) == 0 {
-		dbc.Options = make(Options, 0)
-		return nil
-	}
 
 	dbc.Options = make(Options, len(connOptions)-1)
 	for i := 1; i < len(connOptions); i++ {
@@ -147,7 +143,7 @@ func (dbc *Conf) Set(s string) error {
 // SetDefault provide default vals for options.
 func (dbc *Conf) SetDefault() error {
 	if _, ok := dbc.Options["search_path"]; !ok {
-		dbc.Options["search_path"] = "shortener"
+		dbc.Options["search_path"] = "public"
 	}
 
 	// if _, ok := dbc.Options["sslmode"]; !ok {
