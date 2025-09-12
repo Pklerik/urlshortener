@@ -3,6 +3,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 
@@ -22,6 +23,7 @@ type LinkHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
 	PostText(w http.ResponseWriter, r *http.Request)
 	PostJSON(w http.ResponseWriter, r *http.Request)
+	PingDB(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -78,6 +80,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	w.WriteHeader(http.StatusCreated)
 
 	redirectURL := lh.Args.GetAddressShortURL() + "/" + ld.ShortURL
@@ -103,6 +106,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	var req model.Request
 
 	defer r.Body.Close()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Log.Debug("cannot read body", zap.Error(err))
@@ -110,7 +114,9 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	reader := io.NopCloser(bytes.NewReader(body))
+
 	dec := json.NewDecoder(reader)
 	if err := dec.Decode(&req); err != nil {
 		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
@@ -145,4 +151,20 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Sugar.Infof(`created ShortURL redirection: "%s" for longURL: "%s"`, resp.Result, ld.LongURL)
+}
+
+// PingDB provide 200 for successful database ping.
+func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
+	logger.Sugar.Infof(`Full request: %#v`, *r)
+
+	ctx, cancel := context.WithTimeout(context.Background(), lh.Args.GetTimeout())
+	defer cancel()
+
+	if err := lh.linkService.PingDB(ctx, lh.Args); err != nil {
+		http.Error(w, "ping db error", http.StatusInternalServerError)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

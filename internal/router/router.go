@@ -2,8 +2,8 @@
 package router
 
 import (
+	"context"
 	"net/http"
-	"time"
 
 	//nolint
 
@@ -17,8 +17,18 @@ import (
 )
 
 // ConfigureRouter starts server with base configuration.
-func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
-	linksRepo := repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
+func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) http.Handler {
+	var linksRepo repository.LinksStorager
+
+	switch {
+	case parsedFlags.GetDatabaseConf() != nil:
+		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
+	case parsedFlags.GetLocalStorage() != "":
+		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
+	default:
+		linksRepo = repository.NewInMemoryLinksRepository()
+	}
+
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 	r := chi.NewRouter()
@@ -31,7 +41,7 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 		internalmiddleware.GZIPMiddleware,
 	)
 
-	r.Use(middleware.Timeout(time.Duration(60 * parsedFlags.GetTimeout() * float64(time.Second))))
+	r.Use(middleware.Timeout(parsedFlags.GetTimeout()))
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", linksHandler.Get)
@@ -39,6 +49,7 @@ func ConfigureRouter(parsedFlags config.StartupFlagsParser) http.Handler {
 		r.Route("/api", func(r chi.Router) {
 			r.Post("/shorten", linksHandler.PostJSON)
 		})
+		r.Get("/ping", linksHandler.PingDB)
 	})
 
 	return r

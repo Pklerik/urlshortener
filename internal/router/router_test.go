@@ -4,6 +4,7 @@ package router
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +19,7 @@ import (
 
 func TestRegisterLinkHandler(t *testing.T) {
 	logger.Initialize("DEBUG")
+
 	type want struct {
 		code                int
 		response            string
@@ -30,9 +32,10 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testJSONReq := []byte("{\"url\":\"http://ya.ru\"}")
 	testJSONResp := "\"result\""
 
-	r := ConfigureRouter(&config.StartupFlags{
+	r := ConfigureRouter(context.TODO(), &config.StartupFlags{
 		BaseURL:      redirectHost,
 		LocalStorage: "../../local_storage.json",
+		DBConf:       nil,
 	})
 	srv := httptest.NewServer(r)
 	defer srv.Close()

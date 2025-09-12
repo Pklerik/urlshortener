@@ -3,6 +3,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+
 	"errors"
 	"fmt"
 	"os"
@@ -11,10 +13,14 @@ import (
 	"sync"
 
 	"github.com/goccy/go-json"
+	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
+	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
+	"github.com/Pklerik/urlshortener/migrations"
 )
 
 var (
@@ -22,12 +28,17 @@ var (
 	ErrNotFoundLink = errors.New("link was not found")
 	// ErrExistingURL - can't crate record with existing shortURL.
 	ErrExistingURL = errors.New("can't crate record with existing shortURL")
+	// ErrEmptyDatabaseDSN - DatabaseDSN is empty.
+	ErrEmptyDatabaseDSN = errors.New("DatabaseDSN is empty")
+	// ErrCollectingDBConf - unable to collect DB conf.
+	ErrCollectingDBConf = errors.New("unable to collect DB conf")
 )
 
 // LinksStorager - interface for shortener service.
 type LinksStorager interface {
 	Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
+	PingDB(ctx context.Context, args config.StartupFlagsParser) error
 }
 
 // InMemoryLinksRepository - simple in memory storage.
@@ -40,7 +51,7 @@ type InMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewInMemoryLinksRepository() *InMemoryLinksRepository {
 	return &InMemoryLinksRepository{
-		Shorts: make(map[string]*model.LinkData, config.MapSize),
+		Shorts: make(map[string]*model.LinkData, dictionary.MapSize),
 	}
 }
 
@@ -72,6 +83,11 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 	return *linkData, nil
 }
 
+// PingDB returns nil every time.
+func (r *InMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+	return nil
+}
+
 // LocalMemoryLinksRepository - simple in memory storage.
 type LocalMemoryLinksRepository struct {
 	File string
@@ -81,7 +97,7 @@ type LocalMemoryLinksRepository struct {
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
-	basePath := config.BasePath
+	basePath := dictionary.BasePath
 	if !strings.HasPrefix(filePath, "/") {
 		filePath = filepath.Join(basePath, filePath)
 	}
@@ -104,6 +120,7 @@ func (r *LocalMemoryLinksRepository) Create(_ context.Context, linkData model.Li
 	if err != nil {
 		return model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
+
 	ld, ok := slContains(linkData.ShortURL, slStorage)
 	if ok {
 		return ld, nil
@@ -178,5 +195,172 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 			return linkInfo, true
 		}
 	}
+
 	return model.LinkData{}, false
+}
+
+// PingDB returns ping info from db.
+func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+	return nil
+}
+
+// DBLinksRepository provide base struct for db implementation.
+type DBLinksRepository struct {
+	db *sql.DB
+}
+
+// NewDBLinksRepository - provide new instance DBLinksRepository.
+func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsParser) *DBLinksRepository {
+	db, err := ConnectDB(parsedArgs)
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
+
+	logger.Sugar.Infof("SUCCESS connecting to db: %v", db.Stats())
+
+	err = migrations.MakeMigrations(ctx, db, parsedArgs.GetDatabaseConf())
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
+
+	return &DBLinksRepository{
+		db: db,
+	}
+}
+
+// ConnectDB connecting to DB.
+func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
+	if os.Getenv("GOOSE_DRIVER") == "" {
+		if err := os.Setenv("GOOSE_DRIVER", dbconf.DefaultGooseDrier); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+
+	if os.Getenv("GOOSE_DBSTRING") == "" {
+		if err := os.Setenv("GOOSE_DBSTRING", parsedArgs.GetDatabaseConf().GetConnString()); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+
+	if os.Getenv("GOOSE_MIGRATION_DIR") == "" {
+		dir := filepath.Join(dictionary.BasePath, "migrations")
+		if err := os.Setenv("GOOSE_MIGRATION_DIR", dir); err != nil {
+			return nil, fmt.Errorf("cant set env variable: %w", err)
+		}
+	}
+
+	dbConf := parsedArgs.GetDatabaseConf()
+	logger.Sugar.Infof("ConnString: Database: %s, User: %s, Options: %v",
+		dbConf.(*dbconf.Conf).Database,
+		dbConf.(*dbconf.Conf).User,
+		dbConf.(*dbconf.Conf).Options,
+	)
+
+	if dbConf == nil {
+		return nil, ErrCollectingDBConf
+	}
+
+	ps := dbConf.GetConnString()
+
+	db, err := sql.Open("pgx", ps)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connect to DB: %w", err)
+	}
+
+	return db, nil
+}
+
+// Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
+func (r *DBLinksRepository) Create(ctx context.Context, linkData model.LinkData) (model.LinkData, error) {
+	var (
+		ld  model.LinkData
+		err error
+	)
+
+	ld, err = r.getShort(ctx, linkData.ShortURL)
+	if err == nil {
+		return ld, nil
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		return ld, fmt.Errorf("crate error: %w", err)
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return linkData, fmt.Errorf("error creating tx error: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx, "INSERT INTO links (id, short_url, long_url) VALUES($1, $2, $3)", linkData.UUID, linkData.ShortURL, linkData.LongURL)
+	if err != nil {
+		return linkData, fmt.Errorf("error inserting data to db: %w", err)
+	}
+
+	logger.Sugar.Infof("ld inserted: %s", linkData)
+
+	if err := tx.Commit(); err != nil {
+		return linkData, fmt.Errorf("committing insertion error: %w", err)
+	}
+
+	if rows, err := res.RowsAffected(); err != nil || rows != 1 {
+		return linkData, fmt.Errorf("error parsing result of insertion data to db: %w", err)
+	}
+
+	return linkData, nil
+}
+
+// FindShort - provide model.LinkData and error
+// If shortURL is absent returns ErrNotFoundLink.
+func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
+	var (
+		ld  model.LinkData
+		err error
+	)
+
+	ld, err = r.getShort(ctx, short)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			return ld, fmt.Errorf("crate error: %w", err)
+		}
+
+		return ld, ErrNotFoundLink
+	}
+
+	return ld, nil
+}
+
+// PingDB returns nil every time.
+func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
+	_, err := ConnectDB(args)
+	if err != nil {
+		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+	}
+
+	return nil
+}
+
+func (r *DBLinksRepository) getShort(ctx context.Context, short string) (model.LinkData, error) {
+	linkData := model.LinkData{}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return linkData, fmt.Errorf("error creating tx error: %w", err)
+	}
+
+	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
+
+	err = row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return linkData, sql.ErrNoRows
+		}
+
+		logger.Sugar.Errorf("error selecting db data: %w", err)
+
+		return linkData, fmt.Errorf("error selecting db data: %w", err)
+	}
+
+	logger.Sugar.Infof("LD selected: %v", linkData)
+
+	return linkData, nil
 }

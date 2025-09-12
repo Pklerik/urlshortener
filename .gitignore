@@ -24,3 +24,6 @@ vendor/
 
 # data storage
 local_storage*
+
+# local variables
+.env
