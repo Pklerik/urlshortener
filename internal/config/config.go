@@ -1,9 +1,13 @@
+// Package config provide all app configs.
 package config
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 )
 
 // StartupFlagsParser provide interface for app flags.
@@ -11,17 +15,19 @@ type StartupFlagsParser interface {
 	GetFlags() string
 	GetServerAddress() Address
 	GetAddressShortURL() string
-	GetTimeout() float64
+	GetTimeout() time.Duration
 	GetLogLevel() string
 	GetLocalStorage() string
+	GetDatabaseConf() dbconf.DBConfigurer
 }
 
 // StartupFlags app startup flags.
 type StartupFlags struct {
-	ServerAddress *Address `env:"SERVER_ADDRESS"`
-	BaseURL       string   `env:"BASE_URL"`
-	LogLevel      string   `env:"LOG_LEVEL"`
-	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
+	ServerAddress *Address     `env:"SERVER_ADDRESS"`
+	BaseURL       string       `env:"BASE_URL"`
+	LogLevel      string       `env:"LOG_LEVEL"`
+	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
+	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
 }
 
@@ -45,8 +51,8 @@ func (sf *StartupFlags) GetAddressShortURL() string {
 }
 
 // GetTimeout returns GetTimeout.
-func (sf *StartupFlags) GetTimeout() float64 {
-	return sf.Timeout
+func (sf *StartupFlags) GetTimeout() time.Duration {
+	return time.Duration(sf.Timeout * float64(time.Second))
 }
 
 // GetLogLevel returns LogLevel.
@@ -57,6 +63,19 @@ func (sf *StartupFlags) GetLogLevel() string {
 // GetLocalStorage returns LogLevel.
 func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
+}
+
+// GetDatabaseConf returns pointer to dbconf.DBConfigurer or nil.
+func (sf *StartupFlags) GetDatabaseConf() dbconf.DBConfigurer {
+	if sf.DBConf == nil {
+		return nil
+	}
+
+	if !sf.DBConf.Valid() {
+		return nil
+	}
+
+	return sf.DBConf
 }
 
 // Address base struct.
