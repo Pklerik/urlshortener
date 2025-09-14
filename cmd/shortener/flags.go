@@ -23,7 +23,7 @@ func parseFlags() config.StartupFlagsParser {
 	flag.Parse()
 
 	envArgs := new(config.StartupFlags)
-	// envArgs.DBConf = new(dbconf.Conf)
+
 	err := env.Parse(envArgs)
 	if err != nil {
 		log.Fatal(err)

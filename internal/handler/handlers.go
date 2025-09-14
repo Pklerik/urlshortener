@@ -83,6 +83,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	if errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Found existing urls: status: %d`, http.StatusConflict)
 		w.WriteHeader(http.StatusConflict)
@@ -139,6 +140,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	if errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Found existing urls: status: %d`, http.StatusConflict)
 		w.Header().Set("Content-Type", "application/json")
@@ -193,9 +195,11 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+
 	var req []model.ReqPostBatch
 
 	defer r.Body.Close()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		logger.Log.Debug("cannot read body", zap.Error(err))

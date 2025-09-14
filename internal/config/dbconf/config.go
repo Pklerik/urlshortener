@@ -24,7 +24,9 @@ var (
 // Options is alias for db config options.
 type Options map[string]string
 
-// DBConfigurer provide methods for db configuration.
+/*
+DBConfigurer - interface for DB configuration.
+*/
 type DBConfigurer interface {
 	String() string
 	UnmarshalText(text []byte) error
@@ -186,6 +188,9 @@ func (dbc *Conf) Valid() bool {
 		return false
 	case dbc.Host == "":
 		return false
+	case dbc.Port == "":
+		dbc.Port = "8080"
+		fallthrough
 	default:
 		return true
 	}

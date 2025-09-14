@@ -27,8 +27,10 @@ func MakeMigrations(ctx context.Context, db *sql.DB, dbConf dbconf.DBConfigurer)
 		return fmt.Errorf("crating tx error: %w", err)
 	}
 
-	scheme := dbConf.GetOptions()["search_path"]
-	query := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s;", scheme, dbConf.GetUser())
+	scheme := fmt.Sprintf(`"%s"`, dbConf.GetOptions()["search_path"])
+	user := fmt.Sprintf(`"%s"`, dbConf.GetUser())
+	query := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s;", scheme, user)
+
 	logger.Sugar.Infof("scheme: %s", scheme)
 
 	_, err = tx.ExecContext(ctx, query)

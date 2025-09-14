@@ -43,6 +43,10 @@ func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
 
 // RegisterLinks - register the Link with provided longURL.
 func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error) {
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("RegisterLink context error: %w", ctx.Err())
+	}
+
 	logger.Sugar.Infof("Long urls to short: %v", longURLs)
 	lds := make([]model.LinkData, 0, len(longURLs))
 
@@ -63,6 +67,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
 	}
+
 	if errors.Is(err, repository.ErrExistingLink) {
 		return lds, repository.ErrExistingLink
 	}

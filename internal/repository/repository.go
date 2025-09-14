@@ -136,11 +136,12 @@ func (r *LocalMemoryLinksRepository) Create(_ context.Context, links []model.Lin
 		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 		slStorage = append(slStorage, linkData)
 	}
-
-	if err := r.Write(slStorage); err != nil {
-		logger.Sugar.Errorf("unable to crate record: %w", err)
-		return links, fmt.Errorf("unable to crate record: %w", err)
-	}
+	// асинхронная запись в фаил.
+	go func() {
+		if err := r.Write(slStorage); err != nil {
+			logger.Sugar.Errorf("unable to save file: %w", err)
+		}
+	}()
 
 	return links, nil
 }
@@ -295,7 +296,6 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 
 	for i, linkData := range links {
 		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
-
 		if err != nil {
 			return links, fmt.Errorf("error Create: %w", err)
 		}
@@ -309,21 +309,37 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 		return links, ErrExistingLink
 	}
 
+	var args = make([]interface{}, 0, 3*len(links))
+	var placeholders = make([]string, 0, 3*len(links))
+
 	for i, linkData := range links {
 		if !slices.Contains(newLinksIDs, i) {
 			continue
 		}
 
-		res, err := tx.ExecContext(ctx, "INSERT INTO links (id, short_url, long_url) VALUES($1, $2, $3)", linkData.UUID, linkData.ShortURL, linkData.LongURL)
-		if err != nil {
-			return links, fmt.Errorf("error inserting data to db: %w", err)
-		}
-
-		if rows, err := res.RowsAffected(); err != nil || rows != 1 {
-			return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
-		}
-
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3))
+		args = append(args, linkData.UUID, linkData.ShortURL, linkData.LongURL)
 		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
+	}
+
+	query := fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s", strings.Join(placeholders, ", "))
+
+	res, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		if err := tx.Rollback(); err != nil {
+			return nil, fmt.Errorf("error wile rollback: %w", err)
+		}
+
+		return nil, fmt.Errorf("error inserting link data: %w", err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
+	}
+
+	if rows != int64(len(links)) {
+		return links, fmt.Errorf("not all rows were inserted in db: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -333,6 +349,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 	if len(newLinksIDs) != len(links) {
 		return links, ErrExistingLink
 	}
+
 	return links, nil
 }
 
