@@ -28,9 +28,6 @@ type Options map[string]string
 DBConfigurer - interface for DB configuration.
 */
 type DBConfigurer interface {
-	String() string
-	UnmarshalText(text []byte) error
-	Set(s string) error
 	SetDefault() error
 	GetConnString() string
 	GetOptions() Options
