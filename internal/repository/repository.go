@@ -4,7 +4,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"slices"
 
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/goccy/go-json"
 	_ "github.com/jackc/pgx/v5/stdlib" // import driver for "database/sql"
 
-	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -39,7 +37,7 @@ var (
 type LinksStorager interface {
 	Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
-	PingDB(ctx context.Context, args config.StartupFlagsParser) error
+	PingDB(ctx context.Context) error
 }
 
 // InMemoryLinksRepository - simple in memory storage.
@@ -88,7 +86,7 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 }
 
 // PingDB returns nil every time.
-func (r *InMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+func (r *InMemoryLinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
@@ -102,6 +100,7 @@ type LocalMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
 	basePath := dictionary.BasePath
+
 	fullPath := ""
 	if !strings.HasPrefix(filePath, "/") {
 		fullPath = filepath.Join(basePath, filePath)
@@ -109,9 +108,9 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 
 	fullPath = filepath.Clean(fullPath)
 
-	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0600)
+	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
-		logger.Sugar.Fatalf("error creating storage file: %w", err)
+		logger.Sugar.Fatalf("error creating storage file:%v : %w", fullPath, err)
 	}
 
 	logger.Sugar.Info("Creating file by path: %s", fullPath)
@@ -213,7 +212,7 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 }
 
 // PingDB returns ping info from db.
-func (r *LocalMemoryLinksRepository) PingDB(_ context.Context, _ config.StartupFlagsParser) error {
+func (r *LocalMemoryLinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
@@ -286,8 +285,10 @@ func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 // Create - writes linkData pointer to internal DBLinksRepository map Shorts.
 func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
-		err         error
-		newLinksIDs = make([]int, 0, len(links))
+		err          error
+		newLinksIDs  = make([]int, 0, len(links))
+		queryArgs    = make([]interface{}, 0, 3*len(links))
+		placeholders = make([]string, 0, 3*len(links))
 	)
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -303,6 +304,9 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 
 		if existingLD == nil {
 			newLinksIDs = append(newLinksIDs, i)
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3))
+			queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL)
+			logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 		}
 	}
 
@@ -310,22 +314,9 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 		return links, ErrExistingLink
 	}
 
-	var args = make([]interface{}, 0, 3*len(links))
-	var placeholders = make([]string, 0, 3*len(links))
-
-	for i, linkData := range links {
-		if !slices.Contains(newLinksIDs, i) {
-			continue
-		}
-
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3))
-		args = append(args, linkData.UUID, linkData.ShortURL, linkData.LongURL)
-		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
-	}
-
 	query := fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s", strings.Join(placeholders, ", "))
 
-	res, err := tx.ExecContext(ctx, query, args...)
+	res, err := tx.ExecContext(ctx, query, queryArgs...)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return nil, fmt.Errorf("error wile rollback: %w", err)
@@ -376,7 +367,7 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 }
 
 // PingDB returns nil every time.
-func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
+func (r *DBLinksRepository) PingDB(_ context.Context) error {
 	err := r.db.Ping()
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)

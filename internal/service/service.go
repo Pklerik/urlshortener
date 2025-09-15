@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
@@ -28,7 +27,7 @@ var (
 type LinkServicer interface {
 	RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error)
 	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
-	PingDB(ctx context.Context, args config.StartupFlagsParser) error
+	PingDB(ctx context.Context) error
 }
 
 // BaseLinkService - structure for service repository realization.
@@ -90,20 +89,6 @@ func (ls *BaseLinkService) cutURL(_ context.Context, longURL string) (string, er
 	return shortURL, nil
 }
 
-// checkCollision makes sure that link doesn't have long representation already.
-func (ls *BaseLinkService) checkCollision(ctx context.Context, shortURL, longURL string) error {
-	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
-	if err != nil {
-		return fmt.Errorf("(ls *BaseLinkService) collisionCheck: %w", err)
-	}
-
-	if ld.LongURL != longURL {
-		return fmt.Errorf("(ls *BaseLinkService) collisionCheck: %w", ErrCollision)
-	}
-
-	return nil
-}
-
 // GetShort - provide model.LinkData and error
 // If shortURL is absent returns err.
 func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model.LinkData, error) {
@@ -116,8 +101,8 @@ func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model
 }
 
 // PingDB - provide error if DB is not accessed.
-func (ls *BaseLinkService) PingDB(ctx context.Context, args config.StartupFlagsParser) error {
-	if err := ls.linksRepo.PingDB(ctx, args); err != nil {
+func (ls *BaseLinkService) PingDB(ctx context.Context) error {
+	if err := ls.linksRepo.PingDB(ctx); err != nil {
 		return fmt.Errorf("PingDB error: %w", err)
 	}
 

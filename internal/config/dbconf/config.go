@@ -14,7 +14,7 @@ var (
 	ErrIncorrectDatabaseURL = errors.New("database URL is incorrect, please use mask: postgresql://[user[:password]@][host][:port]/[database][?parameters]")
 	// ErrNotImplemented DBConfigurer instance is not implemented.
 	ErrNotImplemented = errors.New("DBConfigurer instance is not implemented")
-	// ErrEmptyDatabaseConfig
+	// ErrEmptyDatabaseConfig Conf is empty.
 	ErrEmptyDatabaseConfig = errors.New("Conf is empty")
 )
 
@@ -23,12 +23,13 @@ var (
 	DefaultGooseDrier = "postgres"
 )
 
+// ErrNotValidDBConf config fields is not valid.
 type ErrNotValidDBConf struct {
 	fields []string
 }
 
 func (err ErrNotValidDBConf) Error() string {
-	return fmt.Sprintf("Config field is not valid: %v", err.fields)
+	return fmt.Sprintf("config field is not valid: %v", err.fields)
 }
 
 // Options is alias for db config options.
@@ -194,6 +195,7 @@ func (dbc *Conf) Valid() error {
 		// Количество полей равно количеству таковых а Conf.
 		fields: make([]string, 0, 4),
 	}
+
 	switch {
 	case dbc.User == "":
 		err.fields = append(err.fields, "User")
@@ -207,8 +209,10 @@ func (dbc *Conf) Valid() error {
 	default:
 		return nil
 	}
+
 	if len(err.fields) != 0 {
 		return err
 	}
+
 	return nil
 }
