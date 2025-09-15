@@ -102,11 +102,10 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 	logger.Sugar.Info("args file path: ", filePath)
 	basePath := dictionary.BasePath
 	logger.Sugar.Info("Set base path: ", basePath)
-	fullPath := ""
+	fullPath := filePath
 	if !strings.HasPrefix(filePath, "/") {
-		fullPath = filepath.Join(basePath, filePath)
+		fullPath = filepath.Clean(filepath.Join(basePath, filePath))
 	}
-	fullPath = filepath.Clean(fullPath)
 	logger.Sugar.Info("Set full path: ", fullPath)
 
 	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0644)
