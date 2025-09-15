@@ -102,21 +102,22 @@ type LocalMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
 	basePath := dictionary.BasePath
+	fullPath := ""
 	if !strings.HasPrefix(filePath, "/") {
-		filePath = filepath.Join(basePath, filePath)
+		fullPath = filepath.Join(basePath, filePath)
 	}
 
-	filePath = filepath.Clean(filePath)
+	fullPath = filepath.Clean(fullPath)
 
-	_, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0600)
+	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
 		logger.Sugar.Fatalf("error creating storage file: %w", err)
 	}
 
-	logger.Sugar.Info("Creating file by path: %s", filePath)
+	logger.Sugar.Info("Creating file by path: %s", fullPath)
 
 	return &LocalMemoryLinksRepository{
-		File: filePath,
+		File: fullPath,
 	}
 }
 
@@ -222,17 +223,18 @@ type DBLinksRepository struct {
 }
 
 // NewDBLinksRepository - provide new instance DBLinksRepository.
-func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsParser) *DBLinksRepository {
-	db, err := ConnectDB(parsedArgs)
+func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) *DBLinksRepository {
+	db, err := ConnectDB(dbConf)
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
 	}
 
 	logger.Sugar.Infof("SUCCESS connecting to db: %v", db.Stats())
 
-	err = migrations.MakeMigrations(ctx, db, parsedArgs.GetDatabaseConf())
+	err = migrations.MakeMigrations(ctx, db, dbConf)
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
+		return nil
 	}
 
 	return &DBLinksRepository{
@@ -241,7 +243,7 @@ func NewDBLinksRepository(ctx context.Context, parsedArgs config.StartupFlagsPar
 }
 
 // ConnectDB connecting to DB.
-func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
+func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 	if os.Getenv("GOOSE_DRIVER") == "" {
 		if err := os.Setenv("GOOSE_DRIVER", dbconf.DefaultGooseDrier); err != nil {
 			return nil, fmt.Errorf("cant set env variable: %w", err)
@@ -249,7 +251,7 @@ func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 	}
 
 	if os.Getenv("GOOSE_DBSTRING") == "" {
-		if err := os.Setenv("GOOSE_DBSTRING", parsedArgs.GetDatabaseConf().GetConnString()); err != nil {
+		if err := os.Setenv("GOOSE_DBSTRING", dbConf.GetConnString()); err != nil {
 			return nil, fmt.Errorf("cant set env variable: %w", err)
 		}
 	}
@@ -261,7 +263,6 @@ func ConnectDB(parsedArgs config.StartupFlagsParser) (*sql.DB, error) {
 		}
 	}
 
-	dbConf := parsedArgs.GetDatabaseConf()
 	logger.Sugar.Infof("ConnString: Database: %s, User: %s, Options: %v",
 		dbConf.(*dbconf.Conf).Database,
 		dbConf.(*dbconf.Conf).User,
@@ -376,7 +377,7 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 
 // PingDB returns nil every time.
 func (r *DBLinksRepository) PingDB(_ context.Context, args config.StartupFlagsParser) error {
-	_, err := ConnectDB(args)
+	err := r.db.Ping()
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
 	}

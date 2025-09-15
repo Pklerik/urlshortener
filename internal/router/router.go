@@ -21,17 +21,18 @@ import (
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) http.Handler {
 	var linksRepo repository.LinksStorager
 
+	dbConf, err := parsedFlags.GetDatabaseConf()
 	switch {
-	case parsedFlags.GetDatabaseConf() != nil:
-		logger.Sugar.Info("Use DB realization")
+	case err == nil:
+		logger.Sugar.Info("Used DB realization")
 
-		linksRepo = repository.NewDBLinksRepository(ctx, parsedFlags)
+		linksRepo = repository.NewDBLinksRepository(ctx, dbConf)
 	case parsedFlags.GetLocalStorage() != "":
-		logger.Sugar.Info("Use File realization")
+		logger.Sugar.Info("Used File realization")
 
 		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	default:
-		logger.Sugar.Info("Use InMemory realization")
+		logger.Sugar.Info("Used InMemory realization")
 
 		linksRepo = repository.NewInMemoryLinksRepository()
 	}

@@ -14,12 +14,22 @@ var (
 	ErrIncorrectDatabaseURL = errors.New("database URL is incorrect, please use mask: postgresql://[user[:password]@][host][:port]/[database][?parameters]")
 	// ErrNotImplemented DBConfigurer instance is not implemented.
 	ErrNotImplemented = errors.New("DBConfigurer instance is not implemented")
+	// ErrEmptyDatabaseConfig
+	ErrEmptyDatabaseConfig = errors.New("Conf is empty")
 )
 
 var (
 	// DefaultGooseDrier - default driver if not presented.
 	DefaultGooseDrier = "postgres"
 )
+
+type ErrNotValidDBConf struct {
+	fields []string
+}
+
+func (err ErrNotValidDBConf) Error() string {
+	return fmt.Sprintf("Config field is not valid: %v", err.fields)
+}
 
 // Options is alias for db config options.
 type Options map[string]string
@@ -32,7 +42,7 @@ type DBConfigurer interface {
 	GetConnString() string
 	GetOptions() Options
 	GetUser() string
-	Valid() bool
+	Valid() error
 }
 
 // Conf contain attrs for DB configuration.
@@ -49,7 +59,7 @@ type Conf struct {
 // UnmarshalText provide text unmarshaling for Address string.
 func (dbc *Conf) UnmarshalText(text []byte) error {
 	err := dbc.Set(string(text))
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrEmptyDatabaseDSN) {
 		return fmt.Errorf("UnmarshalText: %w", err)
 	}
 
@@ -65,8 +75,10 @@ func (dbc *Conf) String() string {
 // nolint
 func (dbc *Conf) Set(s string) error {
 	if len(s) == 0 {
-		return nil
+		return ErrEmptyDatabaseConfig
 	}
+
+	dbc.RawString = s
 
 	dialectIdx := strings.Index(s, "://")
 	if dialectIdx == -1 {
@@ -177,18 +189,26 @@ func (dbc *Conf) GetOptions() Options {
 }
 
 // Valid return is (dbc *Conf) is valid config.
-func (dbc *Conf) Valid() bool {
+func (dbc *Conf) Valid() error {
+	var err = ErrNotValidDBConf{
+		// Количество полей равно количеству таковых а Conf.
+		fields: make([]string, 0, 4),
+	}
 	switch {
 	case dbc.User == "":
-		return false
+		err.fields = append(err.fields, "User")
 	case dbc.Database == "":
-		return false
+		err.fields = append(err.fields, "Database")
 	case dbc.Host == "":
-		return false
+		err.fields = append(err.fields, "Host")
 	case dbc.Port == "":
-		dbc.Port = "8080"
+		err.fields = append(err.fields, "Port")
 		fallthrough
 	default:
-		return true
+		return nil
 	}
+	if len(err.fields) != 0 {
+		return err
+	}
+	return nil
 }

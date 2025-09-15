@@ -12,13 +12,12 @@ import (
 
 // StartupFlagsParser provide interface for app flags.
 type StartupFlagsParser interface {
-	GetFlags() string
 	GetServerAddress() Address
 	GetAddressShortURL() string
 	GetTimeout() time.Duration
 	GetLogLevel() string
 	GetLocalStorage() string
-	GetDatabaseConf() dbconf.DBConfigurer
+	GetDatabaseConf() (dbconf.DBConfigurer, error)
 }
 
 // StartupFlags app startup flags.
@@ -29,15 +28,6 @@ type StartupFlags struct {
 	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
 	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
-}
-
-// GetFlags provide string representation of flag.
-func (sf *StartupFlags) GetFlags() string {
-	return fmt.Sprintf("ServerAddress: %s, AddressShortURL: %s, Timeout: %f",
-		sf.ServerAddress.String(),
-		sf.BaseURL,
-		sf.Timeout,
-	)
 }
 
 // GetServerAddress returns ServerAddress.
@@ -66,16 +56,16 @@ func (sf *StartupFlags) GetLocalStorage() string {
 }
 
 // GetDatabaseConf returns pointer to dbconf.DBConfigurer or nil.
-func (sf *StartupFlags) GetDatabaseConf() dbconf.DBConfigurer {
+func (sf *StartupFlags) GetDatabaseConf() (dbconf.DBConfigurer, error) {
 	if sf.DBConf == nil {
-		return nil
+		return nil, dbconf.ErrEmptyDatabaseConfig
 	}
 
-	if !sf.DBConf.Valid() {
-		return nil
+	if err := sf.DBConf.Valid(); err != nil {
+		return nil, fmt.Errorf("GetDatabaseConf: %w", err)
 	}
 
-	return sf.DBConf
+	return sf.DBConf, nil
 }
 
 // Address base struct.

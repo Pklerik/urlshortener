@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	baseConfig = &config.StartupFlags{LocalStorage: "local_storage.json", LogLevel: "DEBUG"}
+	baseConfig = &config.StartupFlags{LocalStorage: "../../local_storage.json", LogLevel: "DEBUG"}
 )
 
 func init() {
