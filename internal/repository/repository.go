@@ -99,8 +99,9 @@ type LocalMemoryLinksRepository struct {
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
+	logger.Sugar.Info("args file path: ", filePath)
 	basePath := dictionary.BasePath
-
+	logger.Sugar.Info("Set base path: ", basePath)
 	fullPath := ""
 	if !strings.HasPrefix(filePath, "/") {
 		fullPath = filepath.Join(basePath, filePath)
@@ -113,7 +114,7 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 		logger.Sugar.Fatalf("error creating storage file:%v : %w", fullPath, err)
 	}
 
-	logger.Sugar.Info("Creating file by path: %s", fullPath)
+	logger.Sugar.Info("Creating file by path: ", fullPath)
 
 	return &LocalMemoryLinksRepository{
 		File: fullPath,
