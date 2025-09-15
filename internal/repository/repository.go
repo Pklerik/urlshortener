@@ -106,8 +106,8 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 	if !strings.HasPrefix(filePath, "/") {
 		fullPath = filepath.Join(basePath, filePath)
 	}
-
 	fullPath = filepath.Clean(fullPath)
+	logger.Sugar.Info("Set full path: ", fullPath)
 
 	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
