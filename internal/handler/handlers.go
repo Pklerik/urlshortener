@@ -180,7 +180,7 @@ func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), lh.Args.GetTimeout())
 	defer cancel()
 
-	if err := lh.linkService.PingDB(ctx, lh.Args); err != nil {
+	if err := lh.linkService.PingDB(ctx); err != nil {
 		http.Error(w, "ping db error", http.StatusInternalServerError)
 
 		return
