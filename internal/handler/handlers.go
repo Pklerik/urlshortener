@@ -226,7 +226,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lds, err := lh.linkService.RegisterLinks(r.Context(), reqLongUrls)
-	if err != nil {
+	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 

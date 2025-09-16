@@ -295,7 +295,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
 	}
-
+	pgi := 0
 	for i, linkData := range links {
 		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
 		if err != nil {
@@ -304,8 +304,9 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 
 		if existingLD == nil {
 			newLinksIDs = append(newLinksIDs, i)
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", i*3+1, i*3+2, i*3+3))
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", pgi*3+1, pgi*3+2, pgi*3+3))
 			queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL)
+			pgi++
 			logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 		}
 	}
@@ -325,13 +326,9 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 		return nil, fmt.Errorf("error inserting link data: %w", err)
 	}
 
-	rows, err := res.RowsAffected()
+	_, err = res.RowsAffected()
 	if err != nil {
 		return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
-	}
-
-	if rows != int64(len(links)) {
-		return links, fmt.Errorf("not all rows were inserted in db: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

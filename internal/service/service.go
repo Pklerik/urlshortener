@@ -46,7 +46,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 		return nil, fmt.Errorf("RegisterLink context error: %w", ctx.Err())
 	}
 
-	logger.Sugar.Infof("Long urls to short: %v", longURLs)
+	logger.Sugar.Infof("Long urls to shorten: %v", longURLs)
 	lds := make([]model.LinkData, 0, len(longURLs))
 
 	for _, longURL := range longURLs {
