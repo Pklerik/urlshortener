@@ -133,8 +133,8 @@ func (dbc *Conf) Set(s string) error {
 
 	connOptions := strings.Split(s[connOptionsIdx+1:], "?")
 
-	dbc.Options = make(Options, len(connOptions)-1)
-	for i := 1; i < len(connOptions); i++ {
+	dbc.Options = make(Options, len(connOptions))
+	for i := 0; i < len(connOptions); i++ {
 		var name, value string
 
 		name = strings.Split(connOptions[i], "=")[0]

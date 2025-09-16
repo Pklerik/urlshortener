@@ -22,8 +22,14 @@ func upInitFirstMigration(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("up create table error: %w", err)
 	}
 
+	_, err = tx.ExecContext(ctx,
+		`CREATE UNIQUE INDEX idx_short_url ON links (short_url);`)
+	if err != nil {
+		return fmt.Errorf("up create index idx_short_url error: %w", err)
+	}
+
 	_, _ = tx.ExecContext(ctx,
-		`INSERT INTO links (id, short_url,long_url)
+		`INSERT INTO links (id, short_url, long_url)
 		 VALUES ('019906ca-14b2-7589-b77d-32e3fe12402a', '398f0ca4', 'http://ya.ru')`)
 
 	return nil
