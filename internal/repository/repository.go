@@ -285,61 +285,76 @@ func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 // Create - writes linkData pointer to internal DBLinksRepository map Shorts.
 func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
-		err          error
-		newLinksIDs  = make([]int, 0, len(links))
-		queryArgs    = make([]interface{}, 0, 3*len(links))
-		placeholders = make([]string, 0, 3*len(links))
+		err error
 	)
 
+	insertedLinks, err := r.insertBatch(ctx, links)
+	if err != nil {
+		return links, fmt.Errorf("links insertion error: %w", err)
+	}
+
+	if len(insertedLinks) != len(links) {
+		return insertedLinks, ErrExistingLink
+	}
+
+	return insertedLinks, nil
+}
+
+func (r *DBLinksRepository) insertBatch(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
 	}
-	pgi := 0
-	for i, linkData := range links {
-		existingLD, err := r.getShort(ctx, tx, linkData.ShortURL)
-		if err != nil {
-			return links, fmt.Errorf("error Create: %w", err)
-		}
-
-		if existingLD == nil {
-			newLinksIDs = append(newLinksIDs, i)
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", pgi*3+1, pgi*3+2, pgi*3+3))
-			queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL)
-			pgi++
-			logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
-		}
-	}
-
-	if len(newLinksIDs) == 0 {
-		return links, ErrExistingLink
-	}
-
-	query := fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s", strings.Join(placeholders, ", "))
-
-	res, err := tx.ExecContext(ctx, query, queryArgs...)
+	query, queryArgs := prepareInsertionQuery(links)
+	rows, err := tx.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return nil, fmt.Errorf("error wile rollback: %w", err)
 		}
-
 		return nil, fmt.Errorf("error inserting link data: %w", err)
 	}
 
-	_, err = res.RowsAffected()
+	linksData, err := collectInsertedLinks(rows, len(links))
 	if err != nil {
-		return links, fmt.Errorf("error parsing result of insertion data to db: %w", err)
+		return linksData, fmt.Errorf("error collecting insertion results: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
 		return links, fmt.Errorf("committing insertion error: %w", err)
 	}
 
-	if len(newLinksIDs) != len(links) {
-		return links, ErrExistingLink
+	return linksData, nil
+}
+
+func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
+	var (
+		queryArgs    = make([]interface{}, 0, 3*len(links))
+		placeholders = make([]string, 0, 3*len(links))
+	)
+	for pgi, linkData := range links {
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", pgi*3+1, pgi*3+2, pgi*3+3))
+		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL)
+		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 	}
 
-	return links, nil
+	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url", strings.Join(placeholders, ", ")), queryArgs
+
+}
+
+func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error) {
+	linksData := make([]model.LinkData, 0, lenLinks)
+	for rows.Next() {
+		linkData := model.LinkData{}
+		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				logger.Sugar.Errorf("error scanning INSERT result: %w", err)
+				return linksData, fmt.Errorf("error scanning INSERT result: %w", err)
+			}
+		}
+		linksData = append(linksData, linkData)
+	}
+	return linksData, nil
 }
 
 // FindShort - provide model.LinkData and error
