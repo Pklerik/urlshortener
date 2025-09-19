@@ -52,7 +52,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 	for _, longURL := range longURLs {
 		shortURL, err := ls.cutURL(ctx, longURL)
 		if err != nil {
-			return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
+			return lds, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
 		}
 
 		lds = append(lds, model.LinkData{
@@ -64,7 +64,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 
 	lds, err := ls.linksRepo.Create(ctx, lds)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
-		return lds, fmt.Errorf("(ls *LinkService) RegistaerLink: %w", err)
+		return lds, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
 	}
 
 	if errors.Is(err, repository.ErrExistingLink) {

@@ -294,7 +294,7 @@ func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) 
 	}
 
 	if len(insertedLinks) != len(links) {
-		return insertedLinks, ErrExistingLink
+		return links, ErrExistingLink
 	}
 
 	return insertedLinks, nil

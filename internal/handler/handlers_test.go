@@ -194,3 +194,56 @@ func TestLinkHandle_PingDB(t *testing.T) {
 		})
 	}
 }
+
+func TestLinkHandle_PostBatchJSON(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	r := mock_repository.NewMockLinksStorager(ctrl)
+
+	defer ctrl.Finish()
+	r.EXPECT().Create(gomock.Any(), gomock.Any()).Return([]model.LinkData{{}, {}, {}}, nil).AnyTimes()
+
+	type fields struct {
+		linkService service.LinkServicer
+		Args        config.StartupFlagsParser
+	}
+	type args struct {
+		w http.ResponseWriter
+		r *http.Request
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		{name: "base POST JSON",
+			fields: fields{
+				linkService: service.NewLinksService(r),
+				Args:        &config.StartupFlags{}},
+			args: args{
+				w: httptest.NewRecorder(),
+				r: httptest.NewRequest("POST", "/api/shorten/batch", bytes.NewBuffer([]byte(`[
+    {
+        "correlation_id": "req_id",
+        "original_url": "http://ya.ru"
+    },
+    {
+        "correlation_id": "req_id",
+        "original_url": "http://yandex.ru"
+    },
+    {
+        "correlation_id": "req_id",
+        "original_url": "http://YAyandex.ru"
+    }
+]`)))}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.args.r.Header.Set("Content-Type", "application/json")
+			lh := &LinkHandle{
+				linkService: tt.fields.linkService,
+				Args:        tt.fields.Args,
+			}
+			lh.PostBatchJSON(tt.args.w, tt.args.r)
+		})
+	}
+}

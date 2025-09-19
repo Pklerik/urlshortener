@@ -45,7 +45,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		middleware.RequestID,
 		middleware.RealIP,
 		middleware.Logger,
-		middleware.Recoverer,
+		// middleware.Recoverer,
 		internalmiddleware.GZIPMiddleware,
 	)
 
