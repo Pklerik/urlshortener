@@ -2,13 +2,7 @@
 package model
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
-)
-
-var (
-	ErrReadRequest = errors.New("unable to read request")
 )
 
 // LinkUUIDv7 is a custom type that embeds uuidv7.UUID.
@@ -25,8 +19,9 @@ func (ld *LinkData) String() string {
 	return fmt.Sprintf(`LinkData{UUID: %s, ShortURL: %s, LongURL: %s}`, ld.UUID, ld.ShortURL, ld.LongURL)
 }
 
+// Requester interface provide request struct.
 type Requester interface {
-	StringReq(r *http.Request) string
+	StringReq() string
 }
 
 // Request provide request for shortener.
@@ -34,7 +29,8 @@ type Request struct {
 	URL string `json:"url"`
 }
 
-func (req *Request) StringReq(r *http.Request) string {
+// StringReq (req *Request) returns string representation of interface realization.
+func (req *Request) StringReq() string {
 	return fmt.Sprintf("Request{URL: %s}", req.URL)
 }
 
@@ -44,17 +40,20 @@ type ReqPostBatch struct {
 	LongURL       string `json:"original_url"`
 }
 
+// SlReqPostBatch provide slice of batch requests.
 type SlReqPostBatch []ReqPostBatch
 
-func (reqSl *SlReqPostBatch) StringReq(r *http.Request) string {
-	var res string = "["
+// StringReq (reqSl *SlReqPostBatch) returns string representation of interface realization.
+func (reqSl *SlReqPostBatch) StringReq() string {
+	var res = "["
 	for _, req := range *reqSl {
 		res += fmt.Sprintf("ReqPostBatch{CorrelationID: %s, LongURL: %s}", req.CorrelationID, req.LongURL)
 	}
-	res += "]"
-	return fmt.Sprint(reqSl)
+
+	return fmt.Sprint(reqSl, "]")
 }
 
+// Responser interface provide response struct.
 type Responser interface {
 	Response() string
 }
@@ -64,6 +63,7 @@ type Response struct {
 	Result string `json:"result"`
 }
 
+// Response (r *Response) returns string representation of interface realization.
 func (r *Response) Response() string {
 	return fmt.Sprintf("Response{Result: %s}", r.Result)
 }
@@ -74,17 +74,20 @@ type ResPostBatch struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// Response (r *SlResPostBatch) returns string representation of interface realization.
 func (r *ResPostBatch) Response() string {
 	return fmt.Sprintf("Response{CorrelationID: %s, ShortURL: %s}", r.CorrelationID, r.ShortURL)
 }
 
+// SlResPostBatch provide slice for batch contract.
 type SlResPostBatch []ResPostBatch
 
+// Response (r *SlResPostBatch) returns string representation of interface realization.
 func (r *SlResPostBatch) Response() string {
-	var res string = "["
+	var res = "["
 	for _, resp := range *r {
 		res += fmt.Sprintf("RespPostBatch{CorrelationID: %s, LongURL: %s}", resp.CorrelationID, resp.ShortURL)
 	}
-	res += "]"
-	return res
+
+	return fmt.Sprint(res, "]")
 }

@@ -147,7 +147,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		Result: lh.Args.GetAddressShortURL() + "/" + lds[0].ShortURL,
 	}
 
-	if err := writeRes(lds, w, &resp); err != nil {
+	if err := writeRes(w, &resp); err != nil {
 		logger.Log.Debug("error encoding response", zap.Error(err))
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
 
@@ -212,17 +212,15 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
-	if err := writeRes(lds, w, &resp); err != nil {
+	if err := writeRes(w, &resp); err != nil {
 		logger.Log.Debug("error encoding response", zap.Error(err))
 		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
 
 		return
 	}
-
 }
 
 func readReq(r *http.Request, req model.Requester) error {
-
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
@@ -238,16 +236,17 @@ func readReq(r *http.Request, req model.Requester) error {
 		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
 		return fmt.Errorf("(req *Request) Read: cannot decode request JSON body: %w", err)
 	}
+
 	return nil
 }
 
-func writeRes(lds []model.LinkData, w http.ResponseWriter, res model.Responser) error {
+func writeRes(w http.ResponseWriter, res model.Responser) error {
 	enc := json.NewEncoder(w)
 	logger.Sugar.Debugf("Head: %v", w.Header())
 
 	if err := enc.Encode(res); err != nil {
-
 		return fmt.Errorf("writing Response type: %T, value: %v, error: %w ", res, res, err)
 	}
+
 	return nil
 }
