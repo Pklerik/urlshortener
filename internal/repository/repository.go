@@ -100,12 +100,15 @@ type LocalMemoryLinksRepository struct {
 // Creates capacity based on config.
 func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
 	logger.Sugar.Info("args file path: ", filePath)
+
 	basePath := dictionary.BasePath
 	logger.Sugar.Info("Set base path: ", basePath)
+
 	fullPath := filePath
 	if !strings.HasPrefix(filePath, "/") {
 		fullPath = filepath.Clean(filepath.Join(basePath, filePath))
 	}
+
 	logger.Sugar.Info("Set full path: ", fullPath)
 
 	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0644)
@@ -305,12 +308,15 @@ func (r *DBLinksRepository) insertBatch(ctx context.Context, links []model.LinkD
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
 	}
+
 	query, queryArgs := prepareInsertionQuery(links)
+
 	rows, err := tx.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
 		if err := tx.Rollback(); err != nil {
 			return nil, fmt.Errorf("error wile rollback: %w", err)
 		}
+
 		return nil, fmt.Errorf("error inserting link data: %w", err)
 	}
 
@@ -338,13 +344,13 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	}
 
 	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url", strings.Join(placeholders, ", ")), queryArgs
-
 }
 
 func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error) {
 	linksData := make([]model.LinkData, 0, lenLinks)
 	for rows.Next() {
 		linkData := model.LinkData{}
+
 		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
@@ -352,8 +358,10 @@ func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error
 				return linksData, fmt.Errorf("error scanning INSERT result: %w", err)
 			}
 		}
+
 		linksData = append(linksData, linkData)
 	}
+
 	return linksData, nil
 }
 

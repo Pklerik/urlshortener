@@ -17,6 +17,8 @@ var (
 	ErrNotImplemented = errors.New("DBConfigurer instance is not implemented")
 	// ErrEmptyDatabaseConfig Conf is empty.
 	ErrEmptyDatabaseConfig = errors.New("Conf is empty")
+	// ErrSetDefault unable to set defaults.
+	ErrSetDefault = errors.New("unable to set defaults")
 )
 
 var (
@@ -88,10 +90,12 @@ func (dbc *Conf) Set(s string) error {
 	if err != nil {
 		return fmt.Errorf("error getting dialect: %w", err)
 	}
+
 	credentials, err := getCredentials(s)
 	if err != nil {
 		return fmt.Errorf("error getting credentials: %w", err)
 	}
+
 	dbc.User = credentials.user
 	dbc.Password = credentials.pass
 
@@ -99,6 +103,7 @@ func (dbc *Conf) Set(s string) error {
 	if err != nil {
 		return fmt.Errorf("error getting dbspec: %w", err)
 	}
+
 	dbc.Host = spec.host
 	dbc.Port = spec.port
 	dbc.Database = spec.database
@@ -106,7 +111,7 @@ func (dbc *Conf) Set(s string) error {
 	dbc.Options = getOptions(s)
 
 	if err := dbc.SetDefault(); err != nil {
-		return fmt.Errorf("unable to set defaults")
+		return ErrSetDefault
 	}
 
 	return nil
@@ -115,7 +120,12 @@ func (dbc *Conf) Set(s string) error {
 func getDialect(s string) (string, error) {
 	dialectExp := regexp.MustCompile(`.*:\/\/`)
 	dialect := dialectExp.FindString(s)
+
 	dialect = strings.Trim(dialect, ":/")
+	if dialect == "" {
+		return "", ErrIncorrectDatabaseURL
+	}
+
 	return dialect, nil
 }
 
@@ -125,6 +135,7 @@ func getCredentials(s string) (struct {
 }, error) {
 	credentialsExp := regexp.MustCompile(`:\/\/.*@`)
 	credentials := strings.Trim(credentialsExp.FindString(s), ":/@")
+
 	credentialsSl := strings.Split(credentials, ":")
 	if len(credentialsSl) < 2 {
 		return struct {
@@ -147,6 +158,7 @@ type dbSpec struct {
 
 func getDBSpec(s string) (dbSpec, error) {
 	dbs := dbSpec{}
+
 	bdSpecExp := new(regexp.Regexp)
 	if strings.Contains(s, "?") {
 		bdSpecExp = regexp.MustCompile(`@.*\?`)
@@ -155,13 +167,20 @@ func getDBSpec(s string) (dbSpec, error) {
 	}
 
 	dbStr := bdSpecExp.FindString(s)
+
 	dbStr = strings.Trim(dbStr, "@?")
-	if !strings.Contains(dbStr, ":") || !strings.Contains(dbStr, "/") {
+
+	colonIdx := strings.Index(dbStr, ":")
+	slashIdx := strings.Index(dbStr, "/")
+
+	if colonIdx == -1 || slashIdx == -1 {
 		return dbs, ErrIncorrectDatabaseURL
 	}
-	dbs.host = dbStr[:strings.Index(dbStr, ":")]
-	dbs.port = dbStr[strings.Index(dbStr, ":")+1 : strings.Index(dbStr, "/")]
+
+	dbs.host = dbStr[:colonIdx]
+	dbs.port = dbStr[colonIdx+1 : strings.Index(dbStr, "/")]
 	dbs.database = dbStr[strings.Index(dbStr, "/")+1:]
+
 	return dbs, nil
 }
 
@@ -170,11 +189,20 @@ func getOptions(s string) Options {
 	if optionsIdx == -1 {
 		return Options{}
 	}
+
 	slOptions := strings.Split(s[optionsIdx+1:], "?")
+
 	options := make(Options, len(slOptions))
 	for _, option := range slOptions {
-		options[option[:strings.Index(option, "=")]] = option[strings.Index(option, "=")+1:]
+		delimIdx := strings.Index(option, "=")
+		if delimIdx == -1 {
+			options[option] = ""
+			continue
+		}
+
+		options[option[:delimIdx]] = option[delimIdx+1:]
 	}
+
 	return options
 }
 
