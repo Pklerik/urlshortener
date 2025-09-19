@@ -40,7 +40,7 @@ func TestLinkHandle_Get(t *testing.T) {
 	type args struct {
 		method   string
 		target   string
-		shortURl string
+		shortURL string
 		body     io.Reader
 	}
 
@@ -55,7 +55,7 @@ func TestLinkHandle_Get(t *testing.T) {
 			args: args{
 				method:   "GET",
 				target:   "/",
-				shortURl: "398f0ca4",
+				shortURL: "398f0ca4",
 				body:     nil,
 			}},
 		{name: "empty Get",
@@ -74,8 +74,8 @@ func TestLinkHandle_Get(t *testing.T) {
 				tt.fields.Args,
 			)
 			rctx := chi.NewRouteContext()
-			rctx.URLParams.Add("shortURL", tt.args.shortURl)
-			req := httptest.NewRequest(tt.args.method, tt.args.target+tt.args.shortURl, tt.args.body)
+			rctx.URLParams.Add("shortURL", tt.args.shortURL)
+			req := httptest.NewRequest(tt.args.method, tt.args.target+tt.args.shortURL, tt.args.body)
 			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 			lh.Get(httptest.NewRecorder(), req)
 		})
