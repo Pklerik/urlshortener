@@ -4,6 +4,7 @@ package dbconf
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -48,6 +49,7 @@ type DBConfigurer interface {
 
 // Conf contain attrs for DB configuration.
 type Conf struct {
+	Dialect   string
 	User      string
 	Password  string
 	Host      string
@@ -73,83 +75,107 @@ func (dbc *Conf) String() string {
 }
 
 // Set parse Conf from string.
-// nolint
 func (dbc *Conf) Set(s string) error {
+	var err error
+
 	if len(s) == 0 {
 		return ErrEmptyDatabaseConfig
 	}
 
 	dbc.RawString = s
 
-	dialectIdx := strings.Index(s, "://")
-	if dialectIdx == -1 {
-		return ErrIncorrectDatabaseURL
+	dbc.Dialect, err = getDialect(s)
+	if err != nil {
+		return fmt.Errorf("error getting dialect: %w", err)
 	}
-
-	userIdx := strings.Index(s[dialectIdx+3:], ":")
-	if userIdx == -1 {
-		return ErrIncorrectDatabaseURL
+	credentials, err := getCredentials(s)
+	if err != nil {
+		return fmt.Errorf("error getting credentials: %w", err)
 	}
+	dbc.User = credentials.user
+	dbc.Password = credentials.pass
 
-	userIdx += dialectIdx + 3
-	dbc.User = s[dialectIdx+3 : userIdx]
-
-	passwordIdx := strings.Index(s[userIdx:], "@")
-	if passwordIdx == -1 {
-		return ErrIncorrectDatabaseURL
+	spec, err := getDBSpec(s)
+	if err != nil {
+		return fmt.Errorf("error getting dbspec: %w", err)
 	}
+	dbc.Host = spec.host
+	dbc.Port = spec.port
+	dbc.Database = spec.database
 
-	passwordIdx += userIdx
-	dbc.Password = s[userIdx+1 : passwordIdx]
-
-	hostIdx := strings.Index(s[passwordIdx:], ":")
-	if hostIdx == -1 {
-		return ErrIncorrectDatabaseURL
-	}
-
-	hostIdx += passwordIdx
-	dbc.Host = s[passwordIdx+1 : hostIdx]
-
-	portIdx := strings.Index(s[hostIdx:], "/")
-	if portIdx == -1 {
-		return ErrIncorrectDatabaseURL
-	}
-
-	portIdx += hostIdx
-	if len(s[hostIdx+1:portIdx]) > 0 {
-		dbc.Port = s[hostIdx+1 : portIdx]
-	} else {
-		dbc.Port = "5432"
-	}
-
-	connOptionsIdx := strings.Index(s[portIdx:], "?")
-	if connOptionsIdx == -1 {
-		dbc.Database = s[portIdx+1:]
-		connOptionsIdx = portIdx
-	} else {
-		connOptionsIdx += portIdx
-		dbc.Database = s[portIdx+1 : connOptionsIdx]
-	}
-
-	connOptions := strings.Split(s[connOptionsIdx+1:], "?")
-
-	dbc.Options = make(Options, len(connOptions))
-	for i := 0; i < len(connOptions); i++ {
-		var name, value string
-
-		name = strings.Split(connOptions[i], "=")[0]
-		if len(strings.Split(connOptions[i], "=")) > 1 {
-			value = strings.Split(connOptions[i], "=")[1]
-		}
-
-		dbc.Options[name] = value
-	}
+	dbc.Options = getOptions(s)
 
 	if err := dbc.SetDefault(); err != nil {
 		return fmt.Errorf("unable to set defaults")
 	}
 
 	return nil
+}
+
+func getDialect(s string) (string, error) {
+	dialectExp := regexp.MustCompile(`.*:\/\/`)
+	dialect := dialectExp.FindString(s)
+	dialect = strings.Trim(dialect, ":/")
+	return dialect, nil
+}
+
+func getCredentials(s string) (struct {
+	user string
+	pass string
+}, error) {
+	credentialsExp := regexp.MustCompile(`:\/\/.*@`)
+	credentials := strings.Trim(credentialsExp.FindString(s), ":/@")
+	credentialsSl := strings.Split(credentials, ":")
+	if len(credentialsSl) < 2 {
+		return struct {
+			user string
+			pass string
+		}{}, ErrIncorrectDatabaseURL
+	}
+
+	return struct {
+		user string
+		pass string
+	}{user: credentialsSl[0], pass: credentialsSl[1]}, nil
+}
+
+type dbSpec struct {
+	host     string
+	port     string
+	database string
+}
+
+func getDBSpec(s string) (dbSpec, error) {
+	dbs := dbSpec{}
+	bdSpecExp := new(regexp.Regexp)
+	if strings.Contains(s, "?") {
+		bdSpecExp = regexp.MustCompile(`@.*\?`)
+	} else {
+		bdSpecExp = regexp.MustCompile(`@.*$`)
+	}
+
+	dbStr := bdSpecExp.FindString(s)
+	dbStr = strings.Trim(dbStr, "@?")
+	if !strings.Contains(dbStr, ":") || !strings.Contains(dbStr, "/") {
+		return dbs, ErrIncorrectDatabaseURL
+	}
+	dbs.host = dbStr[:strings.Index(dbStr, ":")]
+	dbs.port = dbStr[strings.Index(dbStr, ":")+1 : strings.Index(dbStr, "/")]
+	dbs.database = dbStr[strings.Index(dbStr, "/")+1:]
+	return dbs, nil
+}
+
+func getOptions(s string) Options {
+	optionsIdx := strings.Index(s, "?")
+	if optionsIdx == -1 {
+		return Options{}
+	}
+	slOptions := strings.Split(s[optionsIdx+1:], "?")
+	options := make(Options, len(slOptions))
+	for _, option := range slOptions {
+		options[option[:strings.Index(option, "=")]] = option[strings.Index(option, "=")+1:]
+	}
+	return options
 }
 
 // SetDefault provide default vals for options.
