@@ -308,15 +308,12 @@ func (r *DBLinksRepository) insertBatch(ctx context.Context, links []model.LinkD
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
 	}
+	defer tx.Rollback()
 
 	query, queryArgs := prepareInsertionQuery(links)
 
 	rows, err := tx.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
-		if err := tx.Rollback(); err != nil {
-			return nil, fmt.Errorf("error wile rollback: %w", err)
-		}
-
 		return nil, fmt.Errorf("error inserting link data: %w", err)
 	}
 
@@ -377,6 +374,7 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 	if err != nil {
 		return *ld, fmt.Errorf("error creating tx error: %w", err)
 	}
+	defer tx.Rollback()
 
 	ld, err = r.getShort(ctx, tx, short)
 	if err != nil {
