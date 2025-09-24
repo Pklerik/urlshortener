@@ -1,5 +1,5 @@
 // Package repository provide abstract implementation for data storage of model/model.go struct
-package repository
+package dbrepo
 
 import (
 	"context"

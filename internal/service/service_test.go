@@ -8,6 +8,7 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
+	"github.com/Pklerik/urlshortener/internal/repository/inmemory"
 )
 
 func TestBaseLinkService_RegisterLinks(t *testing.T) {
@@ -26,7 +27,7 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{name: "Base", fields: fields{linksRepo: repository.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},
+		{name: "Base", fields: fields{linksRepo: inmemory.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

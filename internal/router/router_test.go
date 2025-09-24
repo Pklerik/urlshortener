@@ -32,12 +32,14 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testJSONReq := []byte("{\"url\":\"http://ya.ru\"}")
 	testJSONResp := "\"result\""
 
-	r := ConfigureRouter(context.TODO(), &config.StartupFlags{
+	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
 		BaseURL:      redirectHost,
 		LocalStorage: "../../local_storage.json",
 		DBConf:       nil,
 		Timeout:      10000,
 	})
+	assert.NoError(t, err, "error setup router")
+
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 	client := resty.New()

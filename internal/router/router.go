@@ -12,34 +12,41 @@ import (
 	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository"
+	dbrepo "github.com/Pklerik/urlshortener/internal/repository/db"
+	"github.com/Pklerik/urlshortener/internal/repository/inmemory"
+	"github.com/Pklerik/urlshortener/internal/repository/localfile"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
 
 // ConfigureRouter starts server with base configuration.
-func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) http.Handler {
+func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) (http.Handler, error) {
 	var linksRepo repository.LinksStorager
+	r := chi.NewRouter()
 
 	dbConf, err := parsedFlags.GetDatabaseConf()
 	switch {
 	case err == nil:
 		logger.Sugar.Info("Used DB realization")
 
-		linksRepo = repository.NewDBLinksRepository(ctx, dbConf)
+		linksRepo, err = dbrepo.NewDBLinksRepository(ctx, dbConf)
+		if err != nil {
+			logger.Sugar.Error(err)
+			return r, err
+		}
 	case parsedFlags.GetLocalStorage() != "":
 		logger.Sugar.Info("Used File realization")
 
-		linksRepo = repository.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
+		linksRepo = localfile.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
 	default:
 		logger.Sugar.Info("Used InMemory realization")
 
-		linksRepo = repository.NewInMemoryLinksRepository()
+		linksRepo = inmemory.NewInMemoryLinksRepository()
 	}
 
 	linksService := service.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
-	r := chi.NewRouter()
 
 	r.Use(
 		middleware.RequestID,
@@ -63,5 +70,5 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		r.Get("/ping", linksHandler.PingDB)
 	})
 
-	return r
+	return r, nil
 }
