@@ -200,7 +200,7 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 	r := mock_repository.NewMockLinksStorager(ctrl)
 
 	defer ctrl.Finish()
-	r.EXPECT().Create(gomock.Any(), gomock.Any()).Return([]model.LinkData{{}, {}, {}}, nil).AnyTimes()
+	r.EXPECT().SetLinks(gomock.Any(), gomock.Any()).Return([]model.LinkData{{}, {}, {}}, nil).AnyTimes()
 
 	type fields struct {
 		linkService service.LinkServicer

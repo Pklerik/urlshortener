@@ -35,19 +35,34 @@ func (m *MockLinksStorager) EXPECT() *MockLinksStoragerMockRecorder {
 	return m.recorder
 }
 
-// Create mocks base method.
-func (m *MockLinksStorager) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+// AllUserURLs mocks base method.
+func (m *MockLinksStorager) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, links)
+	ret := m.ctrl.Call(m, "AllUserURLs", ctx, userID)
 	ret0, _ := ret[0].([]model.LinkData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Create indicates an expected call of Create.
-func (mr *MockLinksStoragerMockRecorder) Create(ctx, links interface{}) *gomock.Call {
+// AllUserURLs indicates an expected call of AllUserURLs.
+func (mr *MockLinksStoragerMockRecorder) AllUserURLs(ctx, userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockLinksStorager)(nil).Create), ctx, links)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllUserURLs", reflect.TypeOf((*MockLinksStorager)(nil).AllUserURLs), ctx, userID)
+}
+
+// CreateUser mocks base method.
+func (m *MockLinksStorager) CreateUser(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateUser", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateUser indicates an expected call of CreateUser.
+func (mr *MockLinksStoragerMockRecorder) CreateUser(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockLinksStorager)(nil).CreateUser), ctx)
 }
 
 // FindShort mocks base method.
@@ -79,17 +94,17 @@ func (mr *MockLinksStoragerMockRecorder) PingDB(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PingDB", reflect.TypeOf((*MockLinksStorager)(nil).PingDB), ctx)
 }
 
-// AllUserURLs mocks base method.
-func (m *MockLinksStorager) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
+// SetLinks mocks base method.
+func (m *MockLinksStorager) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AllUserURLs", ctx)
+	ret := m.ctrl.Call(m, "SetLinks", ctx, links)
 	ret0, _ := ret[0].([]model.LinkData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// AllUserURLs indicates an expected call of AllUserURLs.
-func (mr *MockLinksStoragerMockRecorder) AllUserURLs(ctx interface{}, userID interface{}) *gomock.Call {
+// SetLinks indicates an expected call of SetLinks.
+func (mr *MockLinksStoragerMockRecorder) SetLinks(ctx, links interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllUserURLs", reflect.TypeOf((*MockLinksStorager)(nil).AllUserURLs), ctx, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLinks", reflect.TypeOf((*MockLinksStorager)(nil).SetLinks), ctx, links)
 }
