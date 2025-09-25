@@ -13,10 +13,12 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
+	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
+	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 )
@@ -76,8 +78,12 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	userID := getUserIDFromCookie(w, r)
+	if userID == -1 {
+		return
+	}
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{string(body)})
+	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{string(body)}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -120,7 +126,12 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{req.URL})
+	userID := getUserIDFromCookie(w, r)
+	if userID == -1 {
+		return
+	}
+
+	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{req.URL}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -192,8 +203,12 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	for _, reqElem := range req {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
+	userID := getUserIDFromCookie(w, r)
+	if userID == -1 {
+		return
+	}
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), reqLongUrls)
+	lds, err := lh.linkService.RegisterLinks(r.Context(), reqLongUrls, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -249,4 +264,27 @@ func writeRes(w http.ResponseWriter, res model.Responser) error {
 	}
 
 	return nil
+}
+
+func getUserIDFromCookie(w http.ResponseWriter, r *http.Request) int {
+	authCookie, err := r.Cookie("AUTH")
+	if errors.Is(err, http.ErrNoCookie) {
+		logger.Sugar.Infof(`Unable to find auth cookie: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to find auth cookie`, http.StatusUnauthorized)
+
+		return -1
+	}
+	if err != nil {
+		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
+		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
+	}
+
+	userID, err := jwtgenerator.GetUserID(internalmiddleware.SECRET_KEY, authCookie.Value)
+	if err != nil || userID == -1 {
+		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
+
+		return -1
+	}
+	return userID
 }

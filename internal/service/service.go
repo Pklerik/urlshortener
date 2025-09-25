@@ -25,7 +25,7 @@ var (
 
 // LinkServicer provide service contract for link handling.
 type LinkServicer interface {
-	RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error)
+	RegisterLinks(ctx context.Context, longURLs []string, userID int) ([]model.LinkData, error)
 	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
 	PingDB(ctx context.Context) error
 }
@@ -41,7 +41,7 @@ func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
 }
 
 // RegisterLinks - register the Link with provided longURL.
-func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string) ([]model.LinkData, error) {
+func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string, userID int) ([]model.LinkData, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("RegisterLink context error: %w", ctx.Err())
 	}
@@ -59,10 +59,11 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string)
 			UUID:     model.LinkUUIDv7(uuidv7.New().String()),
 			ShortURL: shortURL,
 			LongURL:  longURL,
+			UserId:   userID,
 		})
 	}
 
-	lds, err := ls.linksRepo.Create(ctx, lds)
+	lds, err := ls.linksRepo.SetLinks(ctx, lds)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		return lds, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
 	}

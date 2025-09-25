@@ -49,7 +49,7 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 }
 
 // Create - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
-func (r *LocalMemoryLinksRepository) Create(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *LocalMemoryLinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	slStorage, err := r.Read()
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
@@ -146,4 +146,8 @@ func (r *LocalMemoryLinksRepository) PingDB(_ context.Context) error {
 
 func (r *LocalMemoryLinksRepository) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
 	return []model.LinkData{}, nil
+}
+
+func (r *LocalMemoryLinksRepository) CreateUser(ctx context.Context) (string, error) {
+	return "", nil
 }

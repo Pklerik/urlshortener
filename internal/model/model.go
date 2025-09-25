@@ -13,6 +13,12 @@ type LinkData struct {
 	UUID     LinkUUIDv7 `json:"uuid"`
 	ShortURL string     `json:"short_url"`
 	LongURL  string     `json:"original_url"`
+	UserId   int        `json:"user_id"`
+}
+
+type UserData struct {
+	UserID  int        `json:"user_id"`
+	UrlUUID LinkUUIDv7 `json:"user_links_uuid"`
 }
 
 func (ld *LinkData) String() string {

@@ -83,8 +83,8 @@ func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 	return db, nil
 }
 
-// Create - writes linkData pointer to internal DBLinksRepository map Shorts.
-func (r *DBLinksRepository) Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+// SetLinks - writes linkData pointer to internal DBLinksRepository map Shorts.
+func (r *DBLinksRepository) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
 		err error
 	)
@@ -133,12 +133,12 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 		placeholders = make([]string, 0, 3*len(links))
 	)
 	for pgi, linkData := range links {
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d)", pgi*3+1, pgi*3+2, pgi*3+3))
-		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL)
-		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
+		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserId)
+		logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserId)
 	}
 
-	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url", strings.Join(placeholders, ", ")), queryArgs
+	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
 }
 
 func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error) {
@@ -146,7 +146,7 @@ func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error
 	for rows.Next() {
 		linkData := model.LinkData{}
 
-		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL, &linkData.UserId)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				logger.Sugar.Errorf("error scanning INSERT result: %w", err)
@@ -215,4 +215,8 @@ func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short stri
 
 func (r *DBLinksRepository) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
 	return []model.LinkData{}, nil
+}
+
+func (r *DBLinksRepository) CreateUser(ctx context.Context) (string, error) {
+	return "", nil
 }

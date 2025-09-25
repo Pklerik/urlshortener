@@ -78,3 +78,18 @@ func (mr *MockLinksStoragerMockRecorder) PingDB(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PingDB", reflect.TypeOf((*MockLinksStorager)(nil).PingDB), ctx)
 }
+
+// AllUserURLs mocks base method.
+func (m *MockLinksStorager) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AllUserURLs", ctx)
+	ret0, _ := ret[0].([]model.LinkData)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AllUserURLs indicates an expected call of AllUserURLs.
+func (mr *MockLinksStoragerMockRecorder) AllUserURLs(ctx interface{}, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllUserURLs", reflect.TypeOf((*MockLinksStorager)(nil).AllUserURLs), ctx, userID)
+}

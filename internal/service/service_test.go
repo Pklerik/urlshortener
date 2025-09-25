@@ -32,7 +32,7 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ls := NewLinksService(tt.fields.linksRepo)
-			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs)
+			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs, 0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BaseLinkService.RegisterLinks() error = %v, wantErr %v", err, tt.wantErr)
 				return

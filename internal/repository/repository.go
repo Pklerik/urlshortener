@@ -24,8 +24,9 @@ var (
 
 // LinksStorager - interface for shortener service.
 type LinksStorager interface {
-	Create(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
+	SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
 	AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error)
+	CreateUser(ctx context.Context) (string, error)
 	PingDB(ctx context.Context) error
 }

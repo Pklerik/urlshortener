@@ -25,7 +25,7 @@ func NewInMemoryLinksRepository() *InMemoryLinksRepository {
 }
 
 // Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
-func (r *InMemoryLinksRepository) Create(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *InMemoryLinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -64,4 +64,8 @@ func (r *InMemoryLinksRepository) AllUserURLs(ctx context.Context, userID string
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return []model.LinkData{}, nil
+}
+
+func (r *InMemoryLinksRepository) CreateUser(ctx context.Context) (string, error) {
+	return "", nil
 }

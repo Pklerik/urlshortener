@@ -5,11 +5,18 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
+	"github.com/Pklerik/urlshortener/pkg/random"
+)
+
+var (
+	SECRET_KEY, _ = random.RandBytes(32)
 )
 
 type (
@@ -185,4 +192,33 @@ func (c *compressReader) Close() error {
 		return err //nolint
 	}
 	return c.zr.Close() // nolint
+}
+
+func AuthUser(next http.Handler) http.Handler {
+	authFn := func(w http.ResponseWriter, r *http.Request) {
+		_, err := r.Cookie("AUTH")
+		if err != nil && err != http.ErrNoCookie {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if err == http.ErrNoCookie {
+			validJWT, err := jwtgenerator.BuildJWTString(rand.Int()%100_000, SECRET_KEY)
+			if err != nil {
+				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
+				logger.Sugar.Errorf("Unable to generete JWT: %w", err)
+				return
+			}
+
+			cookieAuth := http.Cookie{
+				Name:  "AUTH",
+				Value: validJWT,
+			}
+			http.SetCookie(w, &cookieAuth)
+			r.AddCookie(&cookieAuth)
+		}
+		// передаём управление хендлеру
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(authFn)
 }

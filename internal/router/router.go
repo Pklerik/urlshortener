@@ -54,6 +54,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		middleware.Logger,
 		// middleware.Recoverer,
 		internalmiddleware.GZIPMiddleware,
+		internalmiddleware.AuthUser,
 	)
 
 	r.Use(middleware.Timeout(parsedFlags.GetTimeout()))
