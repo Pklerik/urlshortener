@@ -60,7 +60,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string,
 			UUID:     model.LinkUUIDv7(uuidv7.New().String()),
 			ShortURL: shortURL,
 			LongURL:  longURL,
-			UserId:   userID,
+			UserID:   userID,
 		})
 	}
 
@@ -111,11 +111,13 @@ func (ls *BaseLinkService) PingDB(ctx context.Context) error {
 	return nil
 }
 
+// ProvideUserLinks provide user links by userID.
 func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
 	lds, err := ls.linksRepo.SelectUserLinks(ctx, userID)
 	if err != nil {
 		return lds, fmt.Errorf("(ls *LinkService) ProvideUserLinks: %w", err)
 	}
+
 	if len(lds) == 0 {
 		return lds, repository.ErrNotFoundLink
 	}

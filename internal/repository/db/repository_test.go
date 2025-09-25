@@ -31,7 +31,7 @@ func TestDBLinksRepository_getShort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := &DBLinksRepository{
+			r := &LinksRepository{
 				db: tt.fields.db,
 			}
 			got, err := r.getShort(tt.args.ctx, tt.args.tx, tt.args.short)

@@ -8,10 +8,6 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-var (
-	tableName = "user_data"
-)
-
 func init() {
 	goose.AddMigrationContext(upUserDataAddedMigration, downUserDataAddedMigration)
 }
@@ -22,6 +18,7 @@ func upUserDataAddedMigration(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("up add column user_id error: %w", err)
 	}
+
 	return nil
 }
 
@@ -31,5 +28,6 @@ func downUserDataAddedMigration(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("down drop column user_id error: %w", err)
 	}
+
 	return nil
 }

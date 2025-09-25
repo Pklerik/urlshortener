@@ -31,11 +31,13 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	argPort := ":" + strconv.Itoa(parsedArgs.GetServerAddress().Port)
 	logger.Sugar.Infof("Setup server with args: port: %s", argPort)
+
 	routerHandler, err := router.ConfigureRouter(ctx, parsedArgs)
 	if err != nil {
 		logger.Sugar.Errorf("Unable to start server: %w", err)
 		return
 	}
+
 	httpServer := &http.Server{
 		Addr:         argPort,
 		Handler:      routerHandler,

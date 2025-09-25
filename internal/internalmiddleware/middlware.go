@@ -3,6 +3,7 @@ package internalmiddleware
 
 import (
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -16,7 +17,8 @@ import (
 )
 
 var (
-	SECRET_KEY, _ = random.RandBytes(32)
+	// SecretKey is generated secret key, which will be recreates each time service is starting.
+	SecretKey, _ = random.RandBytes(32)
 )
 
 type (
@@ -194,19 +196,21 @@ func (c *compressReader) Close() error {
 	return c.zr.Close() // nolint
 }
 
+// AuthUser middleware for user authentication.
 func AuthUser(next http.Handler) http.Handler {
 	authFn := func(w http.ResponseWriter, r *http.Request) {
 		_, err := r.Cookie("AUTH")
-		if err != nil && err != http.ErrNoCookie {
+		if err != nil && !errors.Is(err, http.ErrNoCookie) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		if err == http.ErrNoCookie {
-			validJWT, err := jwtgenerator.BuildJWTString(rand.Int()%100_000, SECRET_KEY)
+		if errors.Is(err, http.ErrNoCookie) {
+			validJWT, err := jwtgenerator.BuildJWTString(rand.Int()%100_000, SecretKey)
 			if err != nil {
 				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
 				logger.Sugar.Errorf("Unable to generete JWT: %w", err)
+
 				return
 			}
 
@@ -220,5 +224,6 @@ func AuthUser(next http.Handler) http.Handler {
 		// передаём управление хендлеру
 		next.ServeHTTP(w, r)
 	}
+
 	return http.HandlerFunc(authFn)
 }

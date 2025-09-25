@@ -79,6 +79,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	userID := getUserIDFromCookie(w, r)
 	if userID == -1 {
 		return
@@ -204,6 +205,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	for _, reqElem := range req {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
+
 	userID := getUserIDFromCookie(w, r)
 	if userID == -1 {
 		return
@@ -236,6 +238,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetUserLinks for handle get request for user data.
 func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
 	userID := getUserIDFromCookie(w, r)
 	if userID == -1 {
@@ -249,6 +252,7 @@ func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	if errors.Is(err, repository.ErrNotFoundLink) {
 		logger.Sugar.Infof(`No links found for User %d: status: %d`, userID, http.StatusBadRequest)
 		w.Header().Set("Content-Type", "application/json")
@@ -256,6 +260,7 @@ func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
 	resp := make(model.LongShortURLs, 0, len(lds))
 	for _, linkData := range lds {
 		resp = append(resp, model.LongShortURL{
@@ -314,17 +319,19 @@ func getUserIDFromCookie(w http.ResponseWriter, r *http.Request) int {
 
 		return -1
 	}
+
 	if err != nil {
 		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
 	}
 
-	userID, err := jwtgenerator.GetUserID(internalmiddleware.SECRET_KEY, authCookie.Value)
+	userID, err := jwtgenerator.GetUserID(internalmiddleware.SecretKey, authCookie.Value)
 	if err != nil || userID == -1 {
 		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
 		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
 
 		return -1
 	}
+
 	return userID
 }

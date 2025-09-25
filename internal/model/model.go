@@ -13,7 +13,7 @@ type LinkData struct {
 	UUID     LinkUUIDv7 `json:"uuid"`
 	ShortURL string     `json:"short_url"`
 	LongURL  string     `json:"original_url"`
-	UserId   int        `json:"user_id"`
+	UserID   int        `json:"user_id"`
 }
 
 func (ld *LinkData) String() string {
@@ -93,13 +93,16 @@ func (r *SlResPostBatch) Response() string {
 	return fmt.Sprint("[", res, "]")
 }
 
+// LongShortURL provide user links contract.
 type LongShortURL struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"original_url"`
 }
 
+// LongShortURLs provide slice for user links contract.
 type LongShortURLs []LongShortURL
 
+// Response (lsu *LongShortURLs) returns string representation of interface realization.
 func (lsu *LongShortURLs) Response() string {
 	var res = ""
 	for _, resp := range *lsu {

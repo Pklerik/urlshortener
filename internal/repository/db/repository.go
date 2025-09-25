@@ -1,3 +1,4 @@
+// Package dbrepo provide realization of repository for db storage.
 package dbrepo
 
 import (
@@ -17,13 +18,13 @@ import (
 	"github.com/Pklerik/urlshortener/migrations"
 )
 
-// DBLinksRepository provide base struct for db implementation.
-type DBLinksRepository struct {
+// LinksRepository provide base struct for db implementation.
+type LinksRepository struct {
 	db *sql.DB
 }
 
 // NewDBLinksRepository - provide new instance DBLinksRepository.
-func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*DBLinksRepository, error) {
+func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*LinksRepository, error) {
 	db, err := ConnectDB(dbConf)
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
@@ -34,10 +35,10 @@ func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*DBL
 	err = migrations.MakeMigrations(ctx, db, dbConf)
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("NewDBLinksRepository: %w", err)
 	}
 
-	return &DBLinksRepository{
+	return &LinksRepository{
 		db: db,
 	}, nil
 }
@@ -84,7 +85,7 @@ func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 }
 
 // SetLinks - writes linkData pointer to internal DBLinksRepository map Shorts.
-func (r *DBLinksRepository) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *LinksRepository) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
 		err error
 	)
@@ -101,7 +102,7 @@ func (r *DBLinksRepository) SetLinks(ctx context.Context, links []model.LinkData
 	return insertedLinks, nil
 }
 
-func (r *DBLinksRepository) insertBatch(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *LinksRepository) insertBatch(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
@@ -134,8 +135,8 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	)
 	for pgi, linkData := range links {
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
-		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserId)
-		logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserId)
+		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserID)
+		logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserID)
 	}
 
 	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
@@ -146,14 +147,14 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 	for rows.Next() {
 		linkData := model.LinkData{}
 
-		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL, &linkData.UserId)
+		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL, &linkData.UserID)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
 				logger.Sugar.Errorf("error scanning QUERY result: %w", err)
 				return linksData, fmt.Errorf("error scanning QUERY result: %w", err)
 			}
 
-			return linksData, err
+			return linksData, fmt.Errorf("collectLinks: %w", err)
 		}
 
 		linksData = append(linksData, linkData)
@@ -164,7 +165,7 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns nil.
-func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
+func (r *LinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
 	var (
 		ld  = new(model.LinkData)
 		err error
@@ -185,7 +186,7 @@ func (r *DBLinksRepository) FindShort(ctx context.Context, short string) (model.
 }
 
 // PingDB returns nil every time.
-func (r *DBLinksRepository) PingDB(_ context.Context) error {
+func (r *LinksRepository) PingDB(_ context.Context) error {
 	err := r.db.Ping()
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
@@ -194,7 +195,7 @@ func (r *DBLinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
+func (r *LinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
 	linkData := model.LinkData{}
 
 	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
@@ -215,7 +216,8 @@ func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short stri
 	return &linkData, nil
 }
 
-func (r *DBLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+// SelectUserLinks selects user links by userID.
+func (r *LinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("error creating tx error: %w", err)
@@ -226,13 +228,16 @@ func (r *DBLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]
 	if err != nil {
 		return nil, fmt.Errorf("error selecting link data: %w", err)
 	}
+
 	lds, err := collectLinks(rows)
 	if err != nil {
 		return nil, fmt.Errorf("error collecting link data: %w", err)
 	}
+
 	return lds, nil
 }
 
-func (r *DBLinksRepository) CreateUser(ctx context.Context) (string, error) {
+// CreateUser creates user.
+func (r *LinksRepository) CreateUser(_ context.Context) (string, error) {
 	return "", nil
 }

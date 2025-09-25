@@ -1,13 +1,15 @@
+// Package localfile provide realization of repository for local file storage.
 package localfile
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/goccy/go-json"
 
 	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -15,15 +17,15 @@ import (
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
 
-// LocalMemoryLinksRepository - simple in memory storage.
-type LocalMemoryLinksRepository struct {
+// LinksRepository - simple in memory storage.
+type LinksRepository struct {
 	File string
 	mu   sync.RWMutex
 }
 
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
 // Creates capacity based on config.
-func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository {
+func NewLocalMemoryLinksRepository(filePath string) *LinksRepository {
 	logger.Sugar.Info("args file path: ", filePath)
 
 	basePath := dictionary.BasePath
@@ -43,13 +45,13 @@ func NewLocalMemoryLinksRepository(filePath string) *LocalMemoryLinksRepository 
 
 	logger.Sugar.Info("Creating file by path: ", fullPath)
 
-	return &LocalMemoryLinksRepository{
+	return &LinksRepository{
 		File: fullPath,
 	}
 }
 
-// Create - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
-func (r *LocalMemoryLinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
+// SetLinks - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
+func (r *LinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	slStorage, err := r.Read()
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
@@ -76,7 +78,7 @@ func (r *LocalMemoryLinksRepository) SetLinks(_ context.Context, links []model.L
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns ErrNotFoundLink.
-func (r *LocalMemoryLinksRepository) FindShort(_ context.Context, short string) (model.LinkData, error) {
+func (r *LinksRepository) FindShort(_ context.Context, short string) (model.LinkData, error) {
 	slStorage, err := r.Read()
 	if err != nil {
 		return model.LinkData{}, fmt.Errorf("unable to find link: %w", err)
@@ -90,7 +92,7 @@ func (r *LocalMemoryLinksRepository) FindShort(_ context.Context, short string) 
 	return model.LinkData{}, repository.ErrNotFoundLink
 }
 
-func (r *LocalMemoryLinksRepository) Read() ([]model.LinkData, error) {
+func (r *LinksRepository) Read() ([]model.LinkData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -112,7 +114,7 @@ func (r *LocalMemoryLinksRepository) Read() ([]model.LinkData, error) {
 	return slStorage, nil
 }
 
-func (r *LocalMemoryLinksRepository) Write(data []model.LinkData) error {
+func (r *LinksRepository) Write(data []model.LinkData) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -140,14 +142,29 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 }
 
 // PingDB returns ping info from db.
-func (r *LocalMemoryLinksRepository) PingDB(_ context.Context) error {
+func (r *LinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *LocalMemoryLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
-	return []model.LinkData{}, nil
+// SelectUserLinks selects user links by userID.
+func (r *LinksRepository) SelectUserLinks(_ context.Context, userID int) ([]model.LinkData, error) {
+	lds := make([]model.LinkData, 0)
+
+	slStorage, err := r.Read()
+	if err != nil {
+		return []model.LinkData{}, fmt.Errorf("SelectUserLinks: %w", err)
+	}
+
+	for _, linkData := range slStorage {
+		if linkData.UserID == userID {
+			lds = append(lds, linkData)
+		}
+	}
+
+	return lds, nil
 }
 
-func (r *LocalMemoryLinksRepository) CreateUser(ctx context.Context) (string, error) {
+// CreateUser creates user.
+func (r *LinksRepository) CreateUser(_ context.Context) (string, error) {
 	return "", nil
 }

@@ -3,6 +3,7 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	//nolint
@@ -23,6 +24,7 @@ import (
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) (http.Handler, error) {
 	var linksRepo repository.LinksStorager
+
 	r := chi.NewRouter()
 
 	dbConf, err := parsedFlags.GetDatabaseConf()
@@ -33,7 +35,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		linksRepo, err = dbrepo.NewDBLinksRepository(ctx, dbConf)
 		if err != nil {
 			logger.Sugar.Error(err)
-			return r, err
+			return r, fmt.Errorf("ConfigureRouter: %w", err)
 		}
 	case parsedFlags.GetLocalStorage() != "":
 		logger.Sugar.Info("Used File realization")

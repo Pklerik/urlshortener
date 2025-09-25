@@ -1,3 +1,4 @@
+// Package inmemory provide realization of repository for runtime in memory storage.
 package inmemory
 
 import (
@@ -10,22 +11,22 @@ import (
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
 
-// InMemoryLinksRepository - simple in memory storage.
-type InMemoryLinksRepository struct {
+// LinksRepository - simple in memory storage.
+type LinksRepository struct {
 	Shorts map[string]*model.LinkData
 	mu     sync.RWMutex
 }
 
 // NewInMemoryLinksRepository - provide new instance InMemoryLinksRepository
 // Creates capacity based on config.
-func NewInMemoryLinksRepository() *InMemoryLinksRepository {
-	return &InMemoryLinksRepository{
+func NewInMemoryLinksRepository() *LinksRepository {
+	return &LinksRepository{
 		Shorts: make(map[string]*model.LinkData, dictionary.MapSize),
 	}
 }
 
-// Create - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
-func (r *InMemoryLinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
+// SetLinks - writes linkData pointer to internal InMemoryLinksRepository map Shorts.
+func (r *LinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -43,7 +44,7 @@ func (r *InMemoryLinksRepository) SetLinks(_ context.Context, links []model.Link
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns ErrNotFoundLink.
-func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (model.LinkData, error) {
+func (r *LinksRepository) FindShort(_ context.Context, short string) (model.LinkData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -56,16 +57,27 @@ func (r *InMemoryLinksRepository) FindShort(_ context.Context, short string) (mo
 }
 
 // PingDB returns nil every time.
-func (r *InMemoryLinksRepository) PingDB(_ context.Context) error {
+func (r *LinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *InMemoryLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+// SelectUserLinks selects user links by userID.
+func (r *LinksRepository) SelectUserLinks(_ context.Context, userID int) ([]model.LinkData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return []model.LinkData{}, nil
+
+	lds := make([]model.LinkData, 0)
+
+	for _, linkData := range r.Shorts {
+		if linkData.UserID == userID {
+			lds = append(lds, *linkData)
+		}
+	}
+
+	return lds, nil
 }
 
-func (r *InMemoryLinksRepository) CreateUser(ctx context.Context) (string, error) {
+// CreateUser creates user.
+func (r *LinksRepository) CreateUser(_ context.Context) (string, error) {
 	return "", nil
 }
