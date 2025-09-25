@@ -144,7 +144,7 @@ func (r *LocalMemoryLinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *LocalMemoryLinksRepository) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
+func (r *LocalMemoryLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
 	return []model.LinkData{}, nil
 }
 

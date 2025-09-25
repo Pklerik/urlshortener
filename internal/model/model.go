@@ -16,11 +16,6 @@ type LinkData struct {
 	UserId   int        `json:"user_id"`
 }
 
-type UserData struct {
-	UserID  int        `json:"user_id"`
-	UrlUUID LinkUUIDv7 `json:"user_links_uuid"`
-}
-
 func (ld *LinkData) String() string {
 	return fmt.Sprintf(`LinkData{UUID: %s, ShortURL: %s, LongURL: %s}`, ld.UUID, ld.ShortURL, ld.LongURL)
 }
@@ -90,10 +85,26 @@ type SlResPostBatch []ResPostBatch
 
 // Response (r *SlResPostBatch) returns string representation of interface realization.
 func (r *SlResPostBatch) Response() string {
-	var res = "["
+	var res = ""
 	for _, resp := range *r {
 		res += fmt.Sprintf("RespPostBatch{CorrelationID: %s, LongURL: %s}", resp.CorrelationID, resp.ShortURL)
 	}
 
-	return fmt.Sprint(res, "]")
+	return fmt.Sprint("[", res, "]")
+}
+
+type LongShortURL struct {
+	ShortURL string `json:"short_url"`
+	LongURL  string `json:"original_url"`
+}
+
+type LongShortURLs []LongShortURL
+
+func (lsu *LongShortURLs) Response() string {
+	var res = ""
+	for _, resp := range *lsu {
+		res += fmt.Sprintf("LongShortURL{ShortURL: %s, LongURL: %s}", resp.ShortURL, resp.ShortURL)
+	}
+
+	return fmt.Sprint("[", res, "]")
 }

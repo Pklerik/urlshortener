@@ -115,8 +115,8 @@ func (r *DBLinksRepository) insertBatch(ctx context.Context, links []model.LinkD
 		return nil, fmt.Errorf("error inserting link data: %w", err)
 	}
 
-	linksData, err := collectInsertedLinks(rows, len(links))
-	if err != nil {
+	linksData, err := collectLinks(rows)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return linksData, fmt.Errorf("error collecting insertion results: %w", err)
 	}
 
@@ -141,17 +141,19 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
 }
 
-func collectInsertedLinks(rows *sql.Rows, lenLinks int) ([]model.LinkData, error) {
-	linksData := make([]model.LinkData, 0, lenLinks)
+func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
+	linksData := make([]model.LinkData, 0, 1)
 	for rows.Next() {
 		linkData := model.LinkData{}
 
 		err := rows.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL, &linkData.UserId)
 		if err != nil {
 			if !errors.Is(err, sql.ErrNoRows) {
-				logger.Sugar.Errorf("error scanning INSERT result: %w", err)
-				return linksData, fmt.Errorf("error scanning INSERT result: %w", err)
+				logger.Sugar.Errorf("error scanning QUERY result: %w", err)
+				return linksData, fmt.Errorf("error scanning QUERY result: %w", err)
 			}
+
+			return linksData, err
 		}
 
 		linksData = append(linksData, linkData)
@@ -213,8 +215,22 @@ func (r *DBLinksRepository) getShort(ctx context.Context, tx *sql.Tx, short stri
 	return &linkData, nil
 }
 
-func (r *DBLinksRepository) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
-	return []model.LinkData{}, nil
+func (r *DBLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return []model.LinkData{}, fmt.Errorf("error creating tx error: %w", err)
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, `SELECT id, short_url, long_url, user_id FROM links WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error selecting link data: %w", err)
+	}
+	lds, err := collectLinks(rows)
+	if err != nil {
+		return nil, fmt.Errorf("error collecting link data: %w", err)
+	}
+	return lds, nil
 }
 
 func (r *DBLinksRepository) CreateUser(ctx context.Context) (string, error) {

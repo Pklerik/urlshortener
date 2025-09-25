@@ -27,6 +27,7 @@ var (
 type LinkServicer interface {
 	RegisterLinks(ctx context.Context, longURLs []string, userID int) ([]model.LinkData, error)
 	GetShort(ctx context.Context, shortURL string) (model.LinkData, error)
+	ProvideUserLinks(ctx context.Context, userID int) ([]model.LinkData, error)
 	PingDB(ctx context.Context) error
 }
 
@@ -108,4 +109,16 @@ func (ls *BaseLinkService) PingDB(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+	lds, err := ls.linksRepo.SelectUserLinks(ctx, userID)
+	if err != nil {
+		return lds, fmt.Errorf("(ls *LinkService) ProvideUserLinks: %w", err)
+	}
+	if len(lds) == 0 {
+		return lds, repository.ErrNotFoundLink
+	}
+
+	return lds, nil
 }

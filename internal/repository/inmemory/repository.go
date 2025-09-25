@@ -60,7 +60,7 @@ func (r *InMemoryLinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *InMemoryLinksRepository) AllUserURLs(ctx context.Context, userID string) ([]model.LinkData, error) {
+func (r *InMemoryLinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return []model.LinkData{}, nil

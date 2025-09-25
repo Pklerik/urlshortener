@@ -30,6 +30,7 @@ type LinkHandler interface {
 	PostJSON(w http.ResponseWriter, r *http.Request)
 	PingDB(w http.ResponseWriter, r *http.Request)
 	PostBatchJSON(w http.ResponseWriter, r *http.Request)
+	GetUserLinks(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -226,6 +227,45 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+
+	if err := writeRes(w, &resp); err != nil {
+		logger.Log.Debug("error encoding response", zap.Error(err))
+		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
+
+		return
+	}
+}
+
+func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
+	userID := getUserIDFromCookie(w, r)
+	if userID == -1 {
+		return
+	}
+
+	lds, err := lh.linkService.ProvideUserLinks(r.Context(), userID)
+	if err != nil && !errors.Is(err, repository.ErrNotFoundLink) {
+		logger.Sugar.Infof(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest), http.StatusBadRequest)
+
+		return
+	}
+	if errors.Is(err, repository.ErrNotFoundLink) {
+		logger.Sugar.Infof(`No links found for User %d: status: %d`, userID, http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNoContent)
+
+		return
+	}
+	resp := make(model.LongShortURLs, 0, len(lds))
+	for _, linkData := range lds {
+		resp = append(resp, model.LongShortURL{
+			LongURL:  linkData.LongURL,
+			ShortURL: lh.Args.GetAddressShortURL() + "/" + linkData.ShortURL,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 
 	if err := writeRes(w, &resp); err != nil {
 		logger.Log.Debug("error encoding response", zap.Error(err))
