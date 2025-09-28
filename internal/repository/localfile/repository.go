@@ -147,7 +147,7 @@ func (r *LinksRepository) PingDB(_ context.Context) error {
 }
 
 // SelectUserLinks selects user links by userID.
-func (r *LinksRepository) SelectUserLinks(_ context.Context, userID int) ([]model.LinkData, error) {
+func (r *LinksRepository) SelectUserLinks(_ context.Context, userID model.UserID) ([]model.LinkData, error) {
 	lds := make([]model.LinkData, 0)
 
 	slStorage, err := r.Read()

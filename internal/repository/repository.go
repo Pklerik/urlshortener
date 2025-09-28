@@ -26,7 +26,7 @@ var (
 type LinksStorager interface {
 	SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
-	SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error)
+	SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error)
 	CreateUser(ctx context.Context) (string, error)
 	PingDB(ctx context.Context) error
 }

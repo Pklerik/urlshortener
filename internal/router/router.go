@@ -10,15 +10,15 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
-	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	dbrepo "github.com/Pklerik/urlshortener/internal/repository/db"
 	"github.com/Pklerik/urlshortener/internal/repository/inmemory"
 	"github.com/Pklerik/urlshortener/internal/repository/localfile"
-	"github.com/Pklerik/urlshortener/internal/service"
+	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	chimiddleware "github.com/go-chi/chi/middleware"
 )
 
 // ConfigureRouter starts server with base configuration.
@@ -47,19 +47,19 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		linksRepo = inmemory.NewInMemoryLinksRepository()
 	}
 
-	linksService := service.NewLinksService(linksRepo)
+	linksService := links.NewLinksService(linksRepo)
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 
 	r.Use(
-		middleware.RequestID,
-		middleware.RealIP,
-		middleware.Logger,
+		chimiddleware.RequestID,
+		chimiddleware.RealIP,
+		chimiddleware.Logger,
 		// middleware.Recoverer,
-		internalmiddleware.GZIPMiddleware,
-		internalmiddleware.AuthUser,
+		middleware.GZIPMiddleware,
+		middleware.AuthUser,
 	)
 
-	r.Use(middleware.Timeout(parsedFlags.GetTimeout()))
+	r.Use(chimiddleware.Timeout(parsedFlags.GetTimeout()))
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/{shortURL}", linksHandler.Get)
@@ -71,6 +71,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 			})
 			r.Route("/user", func(r chi.Router) {
 				r.Get("/urls", linksHandler.GetUserLinks)
+				r.Delete("/urls", linksHandler.DeleteUserLinks)
 			})
 		})
 		r.Get("/ping", linksHandler.PingDB)

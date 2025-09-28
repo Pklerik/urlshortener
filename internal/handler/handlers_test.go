@@ -240,8 +240,8 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.args.r.Header.Set("Content-Type", "application/json")
 			lh := &LinkHandle{
-				linkService: tt.fields.linkService,
-				Args:        tt.fields.Args,
+				service: tt.fields.linkService,
+				Args:    tt.fields.Args,
 			}
 			lh.PostBatchJSON(tt.args.w, tt.args.r)
 		})

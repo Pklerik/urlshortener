@@ -217,7 +217,7 @@ func (r *LinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string
 }
 
 // SelectUserLinks selects user links by userID.
-func (r *LinksRepository) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+func (r *LinksRepository) SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("error creating tx error: %w", err)

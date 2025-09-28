@@ -1,5 +1,5 @@
-// Package service provide all business logic for applications.
-package service
+// Package links provide all business logic for links shortening app.
+package links
 
 import (
 	"context"

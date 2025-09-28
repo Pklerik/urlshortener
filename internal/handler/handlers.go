@@ -13,12 +13,12 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
-	"github.com/Pklerik/urlshortener/internal/internalmiddleware"
 	"github.com/Pklerik/urlshortener/internal/logger"
+
+	middleware "github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
-	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 )
@@ -31,24 +31,25 @@ type LinkHandler interface {
 	PingDB(w http.ResponseWriter, r *http.Request)
 	PostBatchJSON(w http.ResponseWriter, r *http.Request)
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
+	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
 type LinkHandle struct {
-	linkService service.LinkServicer
-	Args        config.StartupFlagsParser
+	service service.LinkServicer
+	Args    config.StartupFlagsParser
 }
 
 // NewLinkHandler returns instance of LinkHandler.
 func NewLinkHandler(userService service.LinkServicer, args config.StartupFlagsParser) LinkHandler {
-	return &LinkHandle{linkService: userService, Args: args}
+	return &LinkHandle{service: userService, Args: args}
 }
 
 // Get returns Handler for URLs registration for GET method.
 func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 	logger.Sugar.Infof(`Full request: %#v`, *r)
 
-	ld, err := lh.linkService.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
+	ld, err := lh.service.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
 	if err != nil {
 		logger.Sugar.Infof(`Unable to find long URL for short: %s: status: %d`, r.URL.Path[1:], http.StatusBadRequest)
 		http.Error(w, `Unable to find long URL for short`, http.StatusBadRequest)
@@ -80,12 +81,12 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := getUserIDFromCookie(w, r)
-	if userID == -1 {
+	userID, err := middleware.GetUserIDFromCookie(w, r)
+	if err != nil {
 		return
 	}
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{string(body)}, userID)
+	lds, err := lh.service.RegisterLinks(r.Context(), []string{string(body)}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -126,14 +127,12 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	defer r.Body.Close()
-
-	userID := getUserIDFromCookie(w, r)
-	if userID == -1 {
+	userID, err := middleware.GetUserIDFromCookie(w, r)
+	if err != nil {
 		return
 	}
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), []string{req.URL}, userID)
+	lds, err := lh.service.RegisterLinks(r.Context(), []string{req.URL}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -177,7 +176,7 @@ func (lh *LinkHandle) PingDB(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), lh.Args.GetTimeout())
 	defer cancel()
 
-	if err := lh.linkService.PingDB(ctx); err != nil {
+	if err := lh.service.PingDB(ctx); err != nil {
 		http.Error(w, "ping db error", http.StatusInternalServerError)
 
 		return
@@ -206,12 +205,12 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
 
-	userID := getUserIDFromCookie(w, r)
-	if userID == -1 {
+	userID, err := middleware.GetUserIDFromCookie(w, r)
+	if err != nil {
 		return
 	}
 
-	lds, err := lh.linkService.RegisterLinks(r.Context(), reqLongUrls, userID)
+	lds, err := lh.service.RegisterLinks(r.Context(), reqLongUrls, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
@@ -240,12 +239,12 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 // GetUserLinks for handle get request for user data.
 func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
-	userID := getUserIDFromCookie(w, r)
-	if userID == -1 {
+	userID, err := middleware.GetUserIDFromCookie(w, r)
+	if err != nil {
 		return
 	}
 
-	lds, err := lh.linkService.ProvideUserLinks(r.Context(), userID)
+	lds, err := lh.service.ProvideUserLinks(r.Context(), userID)
 	if err != nil && !errors.Is(err, repository.ErrNotFoundLink) {
 		logger.Sugar.Infof(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest)
 		http.Error(w, fmt.Sprintf(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest), http.StatusBadRequest)
@@ -280,6 +279,38 @@ func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
+	err := validators.ApplicationJSON(w, r)
+	if err != nil {
+		return
+	}
+
+	var req model.ShortUrls
+	if err := readReq(r, &req); err != nil {
+		logger.Log.Debug("cannot read request", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	userID, err := middleware.GetUserIDFromCookie(w, r)
+	if err != nil {
+		return
+	}
+
+	// Асинхронное выполнение
+	go func() {
+		if _, err := lh.service.MarkAsDeleted(r.Context(), userID, req); err != nil {
+			logger.Sugar.Errorf("Failed to mark URLs as deleted: %v", err)
+		}
+	}()
+
+	if err != nil {
+
+	}
+	w.WriteHeader(http.StatusAccepted)
+	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
+
+}
+
 func readReq(r *http.Request, req model.Requester) error {
 	defer r.Body.Close()
 
@@ -309,29 +340,4 @@ func writeRes(w http.ResponseWriter, res model.Responser) error {
 	}
 
 	return nil
-}
-
-func getUserIDFromCookie(w http.ResponseWriter, r *http.Request) int {
-	authCookie, err := r.Cookie("AUTH")
-	if errors.Is(err, http.ErrNoCookie) {
-		logger.Sugar.Infof(`Unable to find auth cookie: %d`, http.StatusUnauthorized)
-		http.Error(w, `Unable to find auth cookie`, http.StatusUnauthorized)
-
-		return -1
-	}
-
-	if err != nil {
-		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
-		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
-	}
-
-	userID, err := jwtgenerator.GetUserID(internalmiddleware.SecretKey, authCookie.Value)
-	if err != nil || userID == -1 {
-		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
-		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
-
-		return -1
-	}
-
-	return userID
 }

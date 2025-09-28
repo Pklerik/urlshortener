@@ -1,5 +1,5 @@
-// Package internalmiddleware provide decorators for handlers.
-package internalmiddleware
+// Package middleware provide decorators for handlers.
+package middleware
 
 import (
 	"compress/gzip"
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 	"github.com/Pklerik/urlshortener/pkg/random"
 )
@@ -19,6 +20,9 @@ import (
 var (
 	// SecretKey is generated secret key, which will be recreates each time service is starting.
 	SecretKey, _ = random.RandBytes(32)
+
+	// ErrUnauthorizedUser - unauthorized user.
+	ErrUnauthorizedUser = errors.New("unauthorized user")
 )
 
 type (
@@ -206,7 +210,10 @@ func AuthUser(next http.Handler) http.Handler {
 		}
 
 		if errors.Is(err, http.ErrNoCookie) {
-			validJWT, err := jwtgenerator.BuildJWTString(rand.Int()%100_000, SecretKey)
+			validJWT, err := jwtgenerator.BuildJWTString(
+				rand.Int()%100_000,
+				SecretKey,
+			)
 			if err != nil {
 				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
 				logger.Sugar.Errorf("Unable to generete JWT: %w", err)
@@ -226,4 +233,30 @@ func AuthUser(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(authFn)
+}
+
+// GetUserIDFromCookie provide userId auth info.
+func GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error) {
+	authCookie, err := r.Cookie("AUTH")
+	if errors.Is(err, http.ErrNoCookie) {
+		logger.Sugar.Infof(`Unable to find auth cookie: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to find auth cookie`, http.StatusUnauthorized)
+
+		return -1, ErrUnauthorizedUser
+	}
+
+	if err != nil {
+		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
+		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
+	}
+
+	userID, err := jwtgenerator.GetUserID(SecretKey, authCookie.Value)
+	if err != nil || userID == -1 {
+		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
+
+		return -1, ErrUnauthorizedUser
+	}
+
+	return model.UserID(userID), nil
 }

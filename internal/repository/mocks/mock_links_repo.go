@@ -36,7 +36,7 @@ func (m *MockLinksStorager) EXPECT() *MockLinksStoragerMockRecorder {
 }
 
 // SelectUserLinks mocks base method.
-func (m *MockLinksStorager) SelectUserLinks(ctx context.Context, userID int) ([]model.LinkData, error) {
+func (m *MockLinksStorager) SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SelectUserLinks", ctx, userID)
 	ret0, _ := ret[0].([]model.LinkData)
@@ -45,7 +45,7 @@ func (m *MockLinksStorager) SelectUserLinks(ctx context.Context, userID int) ([]
 }
 
 // SelectUserLinks indicates an expected call of SelectUserLinks.
-func (mr *MockLinksStoragerMockRecorder) SelectUserLinks(ctx, userID interface{}) *gomock.Call {
+func (mr *MockLinksStoragerMockRecorder) SelectUserLinks(ctx, userID model.UserIDerface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectUserLinks", reflect.TypeOf((*MockLinksStorager)(nil).SelectUserLinks), ctx, userID)
 }

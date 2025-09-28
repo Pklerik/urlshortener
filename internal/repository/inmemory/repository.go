@@ -62,7 +62,7 @@ func (r *LinksRepository) PingDB(_ context.Context) error {
 }
 
 // SelectUserLinks selects user links by userID.
-func (r *LinksRepository) SelectUserLinks(_ context.Context, userID int) ([]model.LinkData, error) {
+func (r *LinksRepository) SelectUserLinks(_ context.Context, userID model.UserID) ([]model.LinkData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
