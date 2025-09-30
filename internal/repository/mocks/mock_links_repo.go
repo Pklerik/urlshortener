@@ -36,18 +36,17 @@ func (m *MockLinksRepository) EXPECT() *MockLinksRepositoryMockRecorder {
 }
 
 // BatchMarkAsDeleted mocks base method.
-func (m *MockLinksRepository) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
+func (m *MockLinksRepository) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchMarkAsDeleted", ctx, links)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "BatchMarkAsDeleted", ctx, userID, links)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // BatchMarkAsDeleted indicates an expected call of BatchMarkAsDeleted.
-func (mr *MockLinksRepositoryMockRecorder) BatchMarkAsDeleted(ctx, links interface{}) *gomock.Call {
+func (mr *MockLinksRepositoryMockRecorder) BatchMarkAsDeleted(ctx, userID, links interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchMarkAsDeleted", reflect.TypeOf((*MockLinksRepository)(nil).BatchMarkAsDeleted), ctx, links)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchMarkAsDeleted", reflect.TypeOf((*MockLinksRepository)(nil).BatchMarkAsDeleted), ctx, userID, links)
 }
 
 // CreateUser mocks base method.

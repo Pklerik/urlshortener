@@ -130,8 +130,8 @@ func (r *LinksRepositoryPostgres) insertBatch(ctx context.Context, links []model
 
 func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	var (
-		queryArgs    = make([]interface{}, 0, 3*len(links))
-		placeholders = make([]string, 0, 3*len(links))
+		queryArgs    = make([]interface{}, 0, 4*len(links))
+		placeholders = make([]string, 0, 4*len(links))
 	)
 	for pgi, linkData := range links {
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
@@ -164,6 +164,30 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 	}
 
 	return linksData, nil
+}
+
+// TODO  collectIds(rows *sql.Rows, data *any, items ...any) (int, error)
+// provide unification for rows scanning
+// return number of inserted rows and error
+func collectIds(rows *sql.Rows) ([]model.UUIDv7, error) {
+	ids := make([]model.UUIDv7, 0, 1)
+	for rows.Next() {
+		var id model.UUIDv7
+
+		err := rows.Scan(&id)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				logger.Sugar.Errorf("error scanning QUERY result: %w", err)
+				return ids, fmt.Errorf("error scanning QUERY result: %w", err)
+			}
+
+			return ids, fmt.Errorf("collectLinks: %w", err)
+		}
+
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }
 
 // FindShort - provide model.LinkData and error
@@ -201,9 +225,9 @@ func (r *LinksRepositoryPostgres) PingDB(_ context.Context) error {
 func (r *LinksRepositoryPostgres) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
 	linkData := model.LinkData{}
 
-	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
+	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url, user_id, is_deleted FROM links WHERE short_url LIKE $1", short)
 
-	err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL)
+	err := row.Scan(&linkData.UUID, &linkData.ShortURL, &linkData.LongURL, &linkData.UserID, &linkData.IsDeleted)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			logger.Sugar.Errorf("error selecting db data: %w", err)
@@ -247,7 +271,7 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 	if err != nil {
 		return user, fmt.Errorf("error creating tx error: %w", err)
 	}
-	defer tx.Commit()
+	defer tx.Rollback()
 
 	rows, err := tx.QueryContext(ctx, `INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING id`, user.ID)
 	if err != nil {
@@ -272,6 +296,79 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 	return user, nil
 }
 
-func (r *LinksRepositoryPostgres) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
-	return 0, nil
+func (r *LinksRepositoryPostgres) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, linkCh chan model.LinkData) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Sugar.Errorf("error creating tx error: %w", err)
+
+		return fmt.Errorf("error creating tx error: %w", err)
+	}
+
+	batchSize := 10
+	batch := make([]model.UUIDv7, 0, batchSize)
+	logger.Sugar.Infof("batch size: %d", batchSize)
+
+	defer tx.Rollback()
+	for linkData := range linkCh {
+		select {
+		case <-ctx.Done():
+			goto last
+		case <-linkCh:
+			batch = append(batch, linkData.UUID)
+		}
+		if len(batch) == batchSize {
+			logger.Sugar.Infof("Proceed batch: %d", len(batch))
+			proceedBatch(ctx, tx, batch)
+		}
+	}
+last:
+	logger.Sugar.Infof("Proceed batch last time: %d", len(batch))
+	proceedBatch(ctx, tx, batch)
+	tx.Commit()
+
+	return nil
+}
+
+func proceedBatch(ctx context.Context, tx *sql.Tx, ids []model.UUIDv7) (int, error) {
+
+	idsString := fmt.Sprintf("'%s'", func(ids []model.UUIDv7) string {
+		idStr := make([]string, 0, len(ids))
+		for _, id := range ids {
+			idStr = append(idStr, string(id))
+		}
+		return strings.Join(idStr, "', '")
+	}(ids))
+	query := fmt.Sprintf(`UPDATE links AS t
+		SET
+			is_deleted = true
+		WHERE
+			id IN (%s)
+		RETURNING id;`, idsString)
+	// var (
+	// 	queryArgs    = make([]interface{}, 0, 4*len(links))
+	// 	placeholders = make([]string, 0, 4*len(links))
+	// )
+	// for pgi, linkData := range links {
+	// 	placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
+	// 	queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserID)
+	// 	logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserID)
+	// }
+
+	// return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
+	// strIds := func(ids []model.UUIDv7) []string {
+	// 	strIds := make([]string, 0, len(ids))
+	// 	for _, id := range ids {
+	// 		strIds = append(strIds, string(id))
+	// 	}
+	// 	return strIds
+	// }(ids)
+	rows, err := tx.QueryContext(ctx, query)
+	if err != nil {
+		return 0, fmt.Errorf("error selecting link data: %w", err)
+	}
+	deletedIDs, err := collectIds(rows)
+	if err != nil {
+		return 0, fmt.Errorf("error selecting link data: %w", err)
+	}
+	return len(deletedIDs), err
 }

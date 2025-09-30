@@ -88,6 +88,8 @@ func (r *LinksRepositoryMemory) CreateUser(_ context.Context, userID model.UserI
 	return user, nil
 }
 
-func (r *LinksRepositoryMemory) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
-	return 0, nil
+func (r *LinksRepositoryMemory) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return nil
 }

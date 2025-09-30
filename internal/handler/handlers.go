@@ -65,6 +65,13 @@ func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ld.IsDeleted {
+		w.WriteHeader(http.StatusGone)
+		logger.Sugar.Infof(`Full Link: %s, for Short "%s" was deleted.`, ld.LongURL, chi.URLParam(r, "shortURL"))
+
+		return
+	}
+
 	w.Header().Add("Location", ld.LongURL)
 
 	w.WriteHeader(http.StatusTemporaryRedirect)
@@ -306,14 +313,13 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	// Асинхронное выполнение
 	go func() {
-		if _, err := lh.service.MarkAsDeleted(r.Context(), userID, req); err != nil {
+		batchCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err := lh.service.MarkAsDeleted(batchCtx, userID, req); err != nil {
 			logger.Sugar.Errorf("Failed to mark URLs as deleted: %v", err)
 		}
 	}()
 
-	if err != nil {
-
-	}
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
 
@@ -351,8 +357,9 @@ func writeRes(w http.ResponseWriter, res model.Responser) error {
 }
 
 func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
+	cookieName := "auth_user"
 	authFn := func(w http.ResponseWriter, r *http.Request) {
-		_, err := r.Cookie("AUTH")
+		cookieAuth, err := r.Cookie(cookieName)
 		if err != nil && !errors.Is(err, http.ErrNoCookie) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -374,13 +381,15 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 				return
 			}
 
-			cookieAuth := http.Cookie{
-				Name:  "AUTH",
+			cookieAuth = &http.Cookie{
+				Name:  cookieName,
 				Value: validJWT,
+				Path:  "/",
 			}
-			http.SetCookie(w, &cookieAuth)
-			r.AddCookie(&cookieAuth)
+			r.AddCookie(cookieAuth)
 		}
+		http.SetCookie(w, cookieAuth)
+
 		// передаём управление хендлеру
 		next.ServeHTTP(w, r)
 	}
@@ -390,10 +399,10 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 
 // GetUserIDFromCookie provide userId auth info.
 func (lh *LinkHandle) GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error) {
-	authCookie, err := r.Cookie("AUTH")
+	authCookie, err := r.Cookie("auth_user")
 	if errors.Is(err, http.ErrNoCookie) {
-		logger.Sugar.Infof(`Unable to find auth cookie: %d`, http.StatusUnauthorized)
-		http.Error(w, `Unable to find auth cookie`, http.StatusUnauthorized)
+		logger.Sugar.Infof(`Unable to find auth_user cookie: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to find auth_user cookie`, http.StatusUnauthorized)
 
 		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
 	}

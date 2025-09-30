@@ -188,6 +188,6 @@ func (r *LinksRepositoryFile) CreateUser(_ context.Context, userID model.UserID)
 	return user, nil
 }
 
-func (r *LinksRepositoryFile) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
-	return 0, nil
+func (r *LinksRepositoryFile) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error {
+	return nil
 }

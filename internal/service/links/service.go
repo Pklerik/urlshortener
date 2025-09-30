@@ -3,7 +3,9 @@ package links
 
 import (
 	"context"
+	"runtime"
 	"slices"
+	"sync"
 
 	//nolint
 	"crypto/sha256"
@@ -116,20 +118,24 @@ func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID model.Us
 	return lds, nil
 }
 
-func (ls *BaseLinkService) MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) (int, error) {
+func (ls *BaseLinkService) MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) error {
 	userLinks, err := ls.repo.SelectUserLinks(ctx, userID)
 	if err != nil {
-		return 0, fmt.Errorf("MarkAsDeleted: %w", err)
+		return fmt.Errorf("MarkAsDeleted: %w", err)
 	}
 
-	validShortURLs := make([]model.LinkData, 0, len(userLinks))
-	for _, userLink := range userLinks {
-		if slices.Contains(shortLinks, userLink.ShortURL) {
-			validShortURLs = append(validShortURLs, userLink)
-		}
-	}
+	// канал с данными на вход
+	inputCh := deletionLinksGenerator(ctx, userLinks)
+	logger.Sugar.Infof("Create delete generator")
+	// получаем слайс каналов из 10 рабочих linkForDeletion.
+	channels := fanOutDeletionLinks(ctx, inputCh, shortLinks)
+	logger.Sugar.Infof("Create delete fun out pattern")
 
-	return ls.repo.BatchMarkAsDeleted(ctx, validShortURLs)
+	// а теперь объединяем десять каналов в один
+	addResultCh := funInDeletionLinks(ctx, channels...)
+	logger.Sugar.Infof("Create delete fun in pattern")
+
+	return ls.repo.BatchMarkAsDeleted(ctx, userID, addResultCh)
 }
 
 // // DeleteUserLinks deletes user links by shortUrls.
@@ -144,16 +150,37 @@ func (ls *BaseLinkService) MarkAsDeleted(ctx context.Context, userID model.UserI
 // 	return nil
 // }
 
+func linkForDeletion(ctx context.Context, userLinkCh chan model.LinkData, inputLinks model.ShortUrls) chan model.LinkData {
+	linksForDeletionCh := make(chan model.LinkData)
+
+	go func() {
+		// откладываем сообщение о том, что горутина завершилась
+		defer close(linksForDeletionCh)
+		for ul := range userLinkCh {
+			if !slices.Contains(inputLinks, ul.ShortURL) {
+				continue
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case linksForDeletionCh <- ul:
+			}
+		}
+	}()
+
+	return linksForDeletionCh
+}
+
 // generator функция из предыдущего примера, делает то же, что и делала
-func deletionLinksGenerator(doneCh chan struct{}, shortLinks *model.ShortUrls) chan string {
-	inputCh := make(chan string)
+func deletionLinksGenerator(ctx context.Context, links []model.LinkData) chan model.LinkData {
+	inputCh := make(chan model.LinkData)
 
 	go func() {
 		defer close(inputCh)
 
-		for _, data := range *shortLinks {
+		for _, data := range links {
 			select {
-			case <-doneCh:
+			case <-ctx.Done():
 				return
 			case inputCh <- data:
 			}
@@ -163,21 +190,66 @@ func deletionLinksGenerator(doneCh chan struct{}, shortLinks *model.ShortUrls) c
 	return inputCh
 }
 
-// func funInDeletionLinks(doneCh chan struct{}, shortLinks *model.ShortUrls) chan error {
-// 	resErr := make(chan error)
+// fanOut принимает канал данных, порождает 10 горутин
+func fanOutDeletionLinks(ctx context.Context, inputCh chan model.LinkData, inputLinks model.ShortUrls) []chan model.LinkData {
+	// количество горутин add
+	numWorkers := runtime.GOMAXPROCS(0)
+	// каналы, в которые отправляются результаты
+	channels := make([]chan model.LinkData, numWorkers)
 
-// 	// понадобится для ожидания всех горутин
-// 	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		// получаем канал из горутины add
+		addResultCh := linkForDeletion(ctx, inputCh, inputLinks)
+		// отправляем его в слайс каналов
+		channels[i] = addResultCh
+	}
+	// возвращаем слайс каналов
+	return channels
+}
 
-// 	for
-// 	go func() {
-// 		// ждём завершения всех горутин
-// 		wg.Wait()
-// 		// когда все горутины завершились, закрываем результирующий канал
-// 		close(resErr)
-// 	}()
-// 	return resErr
-// }
+// fanIn объединяет несколько каналов resultChs в один.
+func funInDeletionLinks(ctx context.Context, resultChs ...chan model.LinkData) chan model.LinkData {
+	// конечный выходной канал в который отправляем данные из всех каналов из слайса, назовём его результирующим
+	finalCh := make(chan model.LinkData)
+
+	// понадобится для ожидания всех горутин
+	var wg sync.WaitGroup
+
+	// перебираем все входящие каналы
+	for _, ch := range resultChs {
+		// в горутину передавать переменную цикла нельзя, поэтому делаем так
+		chClosure := ch
+
+		// инкрементируем счётчик горутин, которые нужно подождать
+		wg.Add(1)
+
+		go func() {
+			// откладываем сообщение о том, что горутина завершилась
+			defer wg.Done()
+
+			// получаем данные из канала
+			for data := range chClosure {
+				select {
+				// выходим из горутины, если канал закрылся
+				case <-ctx.Done():
+					return
+				// если не закрылся, отправляем данные в конечный выходной канал
+				case finalCh <- data:
+				}
+			}
+		}()
+	}
+
+	go func() {
+		// ждём завершения всех горутин
+		wg.Wait()
+		// когда все горутины завершились, закрываем результирующий канал
+		close(finalCh)
+	}()
+
+	// возвращаем результирующий канал
+	return finalCh
+}
 
 func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
 	switch name {
