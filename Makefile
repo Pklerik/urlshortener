@@ -51,5 +51,5 @@ at: check_new build
     done
 	echo "DONE"
 	
-db_mock:
+repo_mock:
 	mockgen -source=internal/repository/repository.go -destination=internal/repository/mocks/mock_links_repo.go -package=mocks

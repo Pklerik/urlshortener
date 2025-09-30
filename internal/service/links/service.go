@@ -3,6 +3,7 @@ package links
 
 import (
 	"context"
+	"slices"
 
 	//nolint
 	"crypto/sha256"
@@ -18,18 +19,23 @@ import (
 
 // BaseLinkService - structure for service repository realization.
 type BaseLinkService struct {
-	linksRepo repository.LinksStorager
+	repo      repository.LinksRepository
+	secretKey string
 }
 
 // NewLinksService - provide instance of service.
-func NewLinksService(repo repository.LinksStorager) *BaseLinkService {
-	return &BaseLinkService{linksRepo: repo}
+func NewLinksService(repo repository.LinksRepository, secretKey string) *BaseLinkService {
+	return &BaseLinkService{repo: repo, secretKey: secretKey}
 }
 
 // RegisterLinks - register the Link with provided longURL.
 func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string, userID model.UserID) ([]model.LinkData, error) {
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("RegisterLink context error: %w", ctx.Err())
+	}
+	user, err := ls.repo.CreateUser(ctx, userID)
+	if err != nil {
+		return []model.LinkData{}, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
 	}
 
 	logger.Sugar.Infof("Long urls to shorten: %v", longURLs)
@@ -42,14 +48,14 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string,
 		}
 
 		lds = append(lds, model.LinkData{
-			UUID:     model.LinkUUIDv7(uuidv7.New().String()),
+			UUID:     model.UUIDv7(uuidv7.New().String()),
 			ShortURL: shortURL,
 			LongURL:  longURL,
-			UserID:   userID,
+			UserID:   user.ID,
 		})
 	}
 
-	lds, err := ls.linksRepo.SetLinks(ctx, lds)
+	lds, err = ls.repo.SetLinks(ctx, lds)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		return lds, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
 	}
@@ -79,7 +85,7 @@ func (ls *BaseLinkService) cutURL(_ context.Context, longURL string) (string, er
 // GetShort - provide model.LinkData and error
 // If shortURL is absent returns err.
 func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model.LinkData, error) {
-	ld, err := ls.linksRepo.FindShort(ctx, shortURL)
+	ld, err := ls.repo.FindShort(ctx, shortURL)
 	if err != nil {
 		return ld, fmt.Errorf("(ls *LinkService) GetShort: %w", err)
 	}
@@ -89,7 +95,7 @@ func (ls *BaseLinkService) GetShort(ctx context.Context, shortURL string) (model
 
 // PingDB - provide error if DB is not accessed.
 func (ls *BaseLinkService) PingDB(ctx context.Context) error {
-	if err := ls.linksRepo.PingDB(ctx); err != nil {
+	if err := ls.repo.PingDB(ctx); err != nil {
 		return fmt.Errorf("PingDB error: %w", err)
 	}
 
@@ -98,7 +104,7 @@ func (ls *BaseLinkService) PingDB(ctx context.Context) error {
 
 // ProvideUserLinks provide user links by userID.
 func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error) {
-	lds, err := ls.linksRepo.SelectUserLinks(ctx, userID)
+	lds, err := ls.repo.SelectUserLinks(ctx, userID)
 	if err != nil {
 		return lds, fmt.Errorf("(ls *LinkService) ProvideUserLinks: %w", err)
 	}
@@ -111,7 +117,19 @@ func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID model.Us
 }
 
 func (ls *BaseLinkService) MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) (int, error) {
-	return 0, nil
+	userLinks, err := ls.repo.SelectUserLinks(ctx, userID)
+	if err != nil {
+		return 0, fmt.Errorf("MarkAsDeleted: %w", err)
+	}
+
+	validShortURLs := make([]model.LinkData, 0, len(userLinks))
+	for _, userLink := range userLinks {
+		if slices.Contains(shortLinks, userLink.ShortURL) {
+			validShortURLs = append(validShortURLs, userLink)
+		}
+	}
+
+	return ls.repo.BatchMarkAsDeleted(ctx, validShortURLs)
 }
 
 // // DeleteUserLinks deletes user links by shortUrls.
@@ -160,3 +178,12 @@ func deletionLinksGenerator(doneCh chan struct{}, shortLinks *model.ShortUrls) c
 // 	}()
 // 	return resErr
 // }
+
+func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
+	switch name {
+	case "SECRET_KEY":
+		return ls.secretKey, true
+	default:
+		return "", false
+	}
+}

@@ -15,12 +15,13 @@ import (
 	"github.com/Pklerik/urlshortener/internal/repository"
 	mock_repository "github.com/Pklerik/urlshortener/internal/repository/mocks"
 	"github.com/Pklerik/urlshortener/internal/service"
+	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
 	"github.com/golang/mock/gomock"
 )
 
 var (
-	baseConfig = &config.StartupFlags{LocalStorage: "../../local_storage.json", LogLevel: "DEBUG"}
+	baseConfig = &config.StartupFlags{LocalStorage: "../../local_storage.json", LogLevel: "DEBUG", SecretKey: "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs="}
 )
 
 func init() {
@@ -29,7 +30,7 @@ func init() {
 
 func TestLinkHandle_Get(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := mock_repository.NewMockLinksStorager(ctrl)
+	r := mock_repository.NewMockLinksRepository(ctrl)
 
 	defer ctrl.Finish()
 	r.EXPECT().FindShort(gomock.Any(), "398f0ca4").Return(model.LinkData{UUID: "123", ShortURL: "398f0ca4", LongURL: "http://ya.ru"}, nil).AnyTimes()
@@ -70,7 +71,7 @@ func TestLinkHandle_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lh := NewLinkHandler(
-				service.NewLinksService(r),
+				links.NewLinksService(r, baseConfig.GetSecretKey()),
 				tt.fields.Args,
 			)
 			rctx := chi.NewRouteContext()
@@ -84,7 +85,7 @@ func TestLinkHandle_Get(t *testing.T) {
 
 func TestLinkHandle_PostText(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := mock_repository.NewMockLinksStorager(ctrl)
+	r := mock_repository.NewMockLinksRepository(ctrl)
 
 	defer ctrl.Finish()
 	type fields struct {
@@ -103,7 +104,7 @@ func TestLinkHandle_PostText(t *testing.T) {
 	}{
 		{name: "base POST TEXT",
 			fields: fields{
-				linkService: service.NewLinksService(r),
+				linkService: links.NewLinksService(r, baseConfig.GetSecretKey()),
 				Args:        &config.StartupFlags{}},
 			args: args{
 				w: httptest.NewRecorder(),
@@ -122,7 +123,7 @@ func TestLinkHandle_PostText(t *testing.T) {
 
 func TestLinkHandle_PostJson(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := mock_repository.NewMockLinksStorager(ctrl)
+	r := mock_repository.NewMockLinksRepository(ctrl)
 	type fields struct {
 		linkService service.LinkServicer
 		Args        config.StartupFlagsParser
@@ -139,7 +140,7 @@ func TestLinkHandle_PostJson(t *testing.T) {
 	}{
 		{name: "base POST JSON",
 			fields: fields{
-				linkService: service.NewLinksService(r),
+				linkService: links.NewLinksService(r, baseConfig.GetSecretKey()),
 				Args:        &config.StartupFlags{}},
 			args: args{
 				w: httptest.NewRecorder(),
@@ -158,7 +159,7 @@ func TestLinkHandle_PostJson(t *testing.T) {
 
 func TestLinkHandle_PingDB(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := mock_repository.NewMockLinksStorager(ctrl)
+	r := mock_repository.NewMockLinksRepository(ctrl)
 
 	defer ctrl.Finish()
 	r.EXPECT().PingDB(gomock.Any()).Return(nil).AnyTimes()
@@ -178,7 +179,7 @@ func TestLinkHandle_PingDB(t *testing.T) {
 	}{
 		{name: "base PING DB",
 			fields: fields{
-				linkService: service.NewLinksService(r),
+				linkService: links.NewLinksService(r, baseConfig.GetSecretKey()),
 				Args:        baseConfig},
 			args: args{
 				w: httptest.NewRecorder(),
@@ -197,7 +198,7 @@ func TestLinkHandle_PingDB(t *testing.T) {
 
 func TestLinkHandle_PostBatchJSON(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	r := mock_repository.NewMockLinksStorager(ctrl)
+	r := mock_repository.NewMockLinksRepository(ctrl)
 
 	defer ctrl.Finish()
 	r.EXPECT().SetLinks(gomock.Any(), gomock.Any()).Return([]model.LinkData{{}, {}, {}}, nil).AnyTimes()
@@ -217,7 +218,7 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 	}{
 		{name: "base POST JSON",
 			fields: fields{
-				linkService: service.NewLinksService(r),
+				linkService: links.NewLinksService(r, baseConfig.GetSecretKey()),
 				Args:        &config.StartupFlags{}},
 			args: args{
 				w: httptest.NewRecorder(),

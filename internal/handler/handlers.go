@@ -10,17 +10,23 @@ import (
 	"net/http"
 
 	"github.com/goccy/go-json"
+	"github.com/samborkent/uuidv7"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 
-	middleware "github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
+)
+
+var (
+	// ErrUnauthorizedUser - unauthorized user.
+	ErrUnauthorizedUser = errors.New("unauthorized user")
 )
 
 // LinkHandler - provide contract for request handling.
@@ -32,6 +38,8 @@ type LinkHandler interface {
 	PostBatchJSON(w http.ResponseWriter, r *http.Request)
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
 	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
+	AuthUser(next http.Handler) http.Handler
+	GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -81,7 +89,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := middleware.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(w, r)
 	if err != nil {
 		return
 	}
@@ -127,7 +135,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := middleware.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(w, r)
 	if err != nil {
 		return
 	}
@@ -205,7 +213,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
 
-	userID, err := middleware.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(w, r)
 	if err != nil {
 		return
 	}
@@ -239,21 +247,21 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 // GetUserLinks for handle get request for user data.
 func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
-	userID, err := middleware.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(w, r)
 	if err != nil {
 		return
 	}
 
 	lds, err := lh.service.ProvideUserLinks(r.Context(), userID)
 	if err != nil && !errors.Is(err, repository.ErrNotFoundLink) {
-		logger.Sugar.Infof(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest)
-		http.Error(w, fmt.Sprintf(`Unable to get URLs for User %d: status: %d`, userID, http.StatusBadRequest), http.StatusBadRequest)
+		logger.Sugar.Infof(`Unable to get URLs for User %s: status: %d`, userID, http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf(`Unable to get URLs for User %s: status: %d`, userID, http.StatusBadRequest), http.StatusBadRequest)
 
 		return
 	}
 
 	if errors.Is(err, repository.ErrNotFoundLink) {
-		logger.Sugar.Infof(`No links found for User %d: status: %d`, userID, http.StatusBadRequest)
+		logger.Sugar.Infof(`No links found for User %s: status: %d`, userID, http.StatusBadRequest)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNoContent)
 
@@ -291,7 +299,7 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := middleware.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(w, r)
 	if err != nil {
 		return
 	}
@@ -340,4 +348,71 @@ func writeRes(w http.ResponseWriter, res model.Responser) error {
 	}
 
 	return nil
+}
+
+func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
+	authFn := func(w http.ResponseWriter, r *http.Request) {
+		_, err := r.Cookie("AUTH")
+		if err != nil && !errors.Is(err, http.ErrNoCookie) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if errors.Is(err, http.ErrNoCookie) {
+			secretKey, ok := lh.service.GetSecret("SECRET_KEY")
+			if !ok {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			validJWT, err := jwtgenerator.BuildJWTString(
+				uuidv7.New(),
+				secretKey.(string),
+			)
+			if err != nil {
+				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
+				logger.Sugar.Errorf("Unable to generete JWT: %w", err)
+
+				return
+			}
+
+			cookieAuth := http.Cookie{
+				Name:  "AUTH",
+				Value: validJWT,
+			}
+			http.SetCookie(w, &cookieAuth)
+			r.AddCookie(&cookieAuth)
+		}
+		// передаём управление хендлеру
+		next.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(authFn)
+}
+
+// GetUserIDFromCookie provide userId auth info.
+func (lh *LinkHandle) GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error) {
+	authCookie, err := r.Cookie("AUTH")
+	if errors.Is(err, http.ErrNoCookie) {
+		logger.Sugar.Infof(`Unable to find auth cookie: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to find auth cookie`, http.StatusUnauthorized)
+
+		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
+	}
+
+	if err != nil {
+		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
+		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
+	}
+	secretKey, ok := lh.service.GetSecret("SECRET_KEY")
+	if !ok {
+		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
+	}
+	userID, err := jwtgenerator.GetUserID(secretKey.(string), authCookie.Value)
+	if err != nil {
+		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
+		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
+
+		return model.UserID(userID.String()), ErrUnauthorizedUser
+	}
+
+	return model.UserID(model.UUIDv7(userID.String())), nil
 }

@@ -18,9 +18,10 @@ func Test_parseFlags(t *testing.T) {
 		want    config.StartupFlagsParser
 	}{
 		{name: "base",
-			envVars: EnvMap{"DATABASE_DSN": "postgresql://test_user:test_pass@localhost:5432/test_db?search_path=test_schema"},
+			envVars: EnvMap{"DATABASE_DSN": "postgresql://test_user:test_pass@localhost:5432/test_db?search_path=test_schema", "SECRET_KEY": "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs="},
 			want: &config.StartupFlags{ServerAddress: &config.Address{Protocol: "http", Host: "localhost", Port: 8080},
 				BaseURL: "http://localhost:8080", LogLevel: "info", LocalStorage: "local_storage.json", Timeout: 600,
+				SecretKey: "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs=",
 				DBConf: &dbconf.Conf{
 					RawString: "postgresql://test_user:test_pass@localhost:5432/test_db?search_path=test_schema",
 					Dialect:   "postgresql",

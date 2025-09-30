@@ -23,7 +23,7 @@ import (
 
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) (http.Handler, error) {
-	var linksRepo repository.LinksStorager
+	var linksRepo repository.LinksRepository
 
 	r := chi.NewRouter()
 
@@ -47,7 +47,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		linksRepo = inmemory.NewInMemoryLinksRepository()
 	}
 
-	linksService := links.NewLinksService(linksRepo)
+	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 
 	r.Use(
@@ -56,7 +56,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		chimiddleware.Logger,
 		// middleware.Recoverer,
 		middleware.GZIPMiddleware,
-		middleware.AuthUser,
+		linksHandler.AuthUser,
 	)
 
 	r.Use(chimiddleware.Timeout(parsedFlags.GetTimeout()))

@@ -14,7 +14,7 @@ import (
 func TestBaseLinkService_RegisterLinks(t *testing.T) {
 	logger.Initialize("DEBUG")
 	type fields struct {
-		linksRepo repository.LinksStorager
+		linksRepo repository.LinksRepository
 	}
 	type args struct {
 		ctx      context.Context
@@ -31,8 +31,8 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ls := NewLinksService(tt.fields.linksRepo)
-			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs, 0)
+			ls := NewLinksService(tt.fields.linksRepo, "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs=")
+			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs, "0199996a-fd98-780c-b5aa-1aef966fb36e0")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BaseLinkService.RegisterLinks() error = %v, wantErr %v", err, tt.wantErr)
 				return

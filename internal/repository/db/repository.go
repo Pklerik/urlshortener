@@ -18,13 +18,13 @@ import (
 	"github.com/Pklerik/urlshortener/migrations"
 )
 
-// LinksRepository provide base struct for db implementation.
-type LinksRepository struct {
+// LinksRepositoryPostgres provide base struct for db implementation.
+type LinksRepositoryPostgres struct {
 	db *sql.DB
 }
 
 // NewDBLinksRepository - provide new instance DBLinksRepository.
-func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*LinksRepository, error) {
+func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*LinksRepositoryPostgres, error) {
 	db, err := ConnectDB(dbConf)
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
@@ -38,7 +38,7 @@ func NewDBLinksRepository(ctx context.Context, dbConf dbconf.DBConfigurer) (*Lin
 		return nil, fmt.Errorf("NewDBLinksRepository: %w", err)
 	}
 
-	return &LinksRepository{
+	return &LinksRepositoryPostgres{
 		db: db,
 	}, nil
 }
@@ -85,7 +85,7 @@ func ConnectDB(dbConf dbconf.DBConfigurer) (*sql.DB, error) {
 }
 
 // SetLinks - writes linkData pointer to internal DBLinksRepository map Shorts.
-func (r *LinksRepository) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *LinksRepositoryPostgres) SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	var (
 		err error
 	)
@@ -102,7 +102,7 @@ func (r *LinksRepository) SetLinks(ctx context.Context, links []model.LinkData) 
 	return insertedLinks, nil
 }
 
-func (r *LinksRepository) insertBatch(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
+func (r *LinksRepositoryPostgres) insertBatch(ctx context.Context, links []model.LinkData) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return links, fmt.Errorf("error creating tx error: %w", err)
@@ -142,6 +142,9 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
 }
 
+// TODO  collectLinks(rows *sql.Rows, data *any, items ...any) (int, error)
+// provide unification for rows scanning
+// return number of inserted rows and error
 func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 	linksData := make([]model.LinkData, 0, 1)
 	for rows.Next() {
@@ -165,7 +168,7 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns nil.
-func (r *LinksRepository) FindShort(ctx context.Context, short string) (model.LinkData, error) {
+func (r *LinksRepositoryPostgres) FindShort(ctx context.Context, short string) (model.LinkData, error) {
 	var (
 		ld  = new(model.LinkData)
 		err error
@@ -186,7 +189,7 @@ func (r *LinksRepository) FindShort(ctx context.Context, short string) (model.Li
 }
 
 // PingDB returns nil every time.
-func (r *LinksRepository) PingDB(_ context.Context) error {
+func (r *LinksRepositoryPostgres) PingDB(_ context.Context) error {
 	err := r.db.Ping()
 	if err != nil {
 		logger.Sugar.Errorf("Cant connect to db server: %w", err)
@@ -195,7 +198,7 @@ func (r *LinksRepository) PingDB(_ context.Context) error {
 	return nil
 }
 
-func (r *LinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
+func (r *LinksRepositoryPostgres) getShort(ctx context.Context, tx *sql.Tx, short string) (*model.LinkData, error) {
 	linkData := model.LinkData{}
 
 	row := tx.QueryRowContext(ctx, "SELECT id, short_url, long_url FROM links WHERE short_url LIKE $1", short)
@@ -217,7 +220,7 @@ func (r *LinksRepository) getShort(ctx context.Context, tx *sql.Tx, short string
 }
 
 // SelectUserLinks selects user links by userID.
-func (r *LinksRepository) SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error) {
+func (r *LinksRepositoryPostgres) SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("error creating tx error: %w", err)
@@ -238,6 +241,37 @@ func (r *LinksRepository) SelectUserLinks(ctx context.Context, userID model.User
 }
 
 // CreateUser creates user.
-func (r *LinksRepository) CreateUser(_ context.Context) (string, error) {
-	return "", nil
+func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.UserID) (model.User, error) {
+	user := model.User{ID: userID}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return user, fmt.Errorf("error creating tx error: %w", err)
+	}
+	defer tx.Commit()
+
+	rows, err := tx.QueryContext(ctx, `INSERT INTO users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING id`, user.ID)
+	if err != nil {
+		return user, fmt.Errorf("error selecting link data: %w", err)
+	}
+	for rows.Next() {
+		err := rows.Scan(&user.ID)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				logger.Sugar.Errorf("error scanning QUERY result: %w", err)
+
+				return user, fmt.Errorf("error scanning QUERY result: %w", err)
+			}
+
+			return user, fmt.Errorf("collect users: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return user, fmt.Errorf("committing insertion error: %w", err)
+	}
+
+	return user, nil
+}
+
+func (r *LinksRepositoryPostgres) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
+	return 0, nil
 }

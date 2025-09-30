@@ -8,6 +8,7 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/samborkent/uuidv7"
 )
 
 var (
@@ -21,14 +22,14 @@ var (
 // одно пользовательское UserID.
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID int
+	UserID uuidv7.UUID
 }
 
 // TokenExp time for token validation.
 const TokenExp = time.Hour * 3
 
 // BuildJWTString creates token and return it in string.
-func BuildJWTString(userID int, secretKey string) (string, error) {
+func BuildJWTString(userID uuidv7.UUID, secretKey string) (string, error) {
 	// crate new token with algorithm fore sine  HS256  and some claims — Claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -50,7 +51,7 @@ func BuildJWTString(userID int, secretKey string) (string, error) {
 }
 
 // GetUserID provide UserId and error for secretKey and jwtToken.
-func GetUserID(secretKey string, jwtToken string) (int, error) {
+func GetUserID(secretKey string, jwtToken string) (uuidv7.UUID, error) {
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(jwtToken, claims, func(t *jwt.Token) (interface{}, error) {
@@ -61,12 +62,12 @@ func GetUserID(secretKey string, jwtToken string) (int, error) {
 		return []byte(secretKey), nil
 	})
 	if err != nil {
-		return -1, ErrTokenParsing
+		return uuidv7.New(), ErrTokenParsing
 	}
 
 	if !token.Valid {
 		logger.Sugar.Error(ErrTokenValidation)
-		return -1, ErrTokenValidation
+		return uuidv7.New(), ErrTokenValidation
 	}
 
 	return claims.UserID, nil

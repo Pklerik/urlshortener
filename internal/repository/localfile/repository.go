@@ -17,15 +17,20 @@ import (
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
 
-// LinksRepository - simple in memory storage.
-type LinksRepository struct {
+// LinksRepositoryFile - simple in memory storage.
+type LinksRepositoryFile struct {
 	File string
 	mu   sync.RWMutex
 }
 
+type FullData struct {
+	Links []model.LinkData            `json:"links"`
+	Users map[model.UserID]model.User `json:"users"`
+}
+
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
 // Creates capacity based on config.
-func NewLocalMemoryLinksRepository(filePath string) *LinksRepository {
+func NewLocalMemoryLinksRepository(filePath string) *LinksRepositoryFile {
 	logger.Sugar.Info("args file path: ", filePath)
 
 	basePath := dictionary.BasePath
@@ -45,30 +50,31 @@ func NewLocalMemoryLinksRepository(filePath string) *LinksRepository {
 
 	logger.Sugar.Info("Creating file by path: ", fullPath)
 
-	return &LinksRepository{
+	return &LinksRepositoryFile{
 		File: fullPath,
 	}
 }
 
 // SetLinks - writes linkData pointer to internal LocalMemoryLinksRepository map Shorts.
-func (r *LinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
-	slStorage, err := r.Read()
+func (r *LinksRepositoryFile) SetLinks(_ context.Context, links []model.LinkData) ([]model.LinkData, error) {
+	fullData, err := r.Read()
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("unable to crate link: %w", err)
 	}
 
 	for _, linkData := range links {
-		_, ok := slContains(linkData.ShortURL, slStorage)
+		_, ok := slContains(linkData.ShortURL, fullData.Links)
 		if ok {
 			continue
 		}
 
 		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
-		slStorage = append(slStorage, linkData)
+		fullData.Links = append(fullData.Links, linkData)
+		fullData.Users[linkData.UserID] = model.User{ID: linkData.UserID}
 	}
 	// асинхронная запись в фаил.
 	go func() {
-		if err := r.Write(slStorage); err != nil {
+		if err := r.Write(fullData); err != nil {
 			logger.Sugar.Errorf("unable to save file: %w", err)
 		}
 	}()
@@ -78,13 +84,13 @@ func (r *LinksRepository) SetLinks(_ context.Context, links []model.LinkData) ([
 
 // FindShort - provide model.LinkData and error
 // If shortURL is absent returns ErrNotFoundLink.
-func (r *LinksRepository) FindShort(_ context.Context, short string) (model.LinkData, error) {
-	slStorage, err := r.Read()
+func (r *LinksRepositoryFile) FindShort(_ context.Context, short string) (model.LinkData, error) {
+	data, err := r.Read()
 	if err != nil {
 		return model.LinkData{}, fmt.Errorf("unable to find link: %w", err)
 	}
 
-	ld, ok := slContains(short, slStorage)
+	ld, ok := slContains(short, data.Links)
 	if ok {
 		return ld, nil
 	}
@@ -92,29 +98,30 @@ func (r *LinksRepository) FindShort(_ context.Context, short string) (model.Link
 	return model.LinkData{}, repository.ErrNotFoundLink
 }
 
-func (r *LinksRepository) Read() ([]model.LinkData, error) {
+func (r *LinksRepositoryFile) Read() (FullData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	var fullData FullData = FullData{
+		Users: make(map[model.UserID]model.User, dictionary.MapSize),
+	}
 	slByte, err := os.ReadFile(r.File)
 	if err != nil {
-		return []model.LinkData{}, fmt.Errorf("unable to open file: %w", err)
+		return fullData, fmt.Errorf("unable to open file: %w", err)
 	}
-
-	var slStorage = make([]model.LinkData, 0)
 	if len(slByte) == 0 {
-		return slStorage, nil
+		return fullData, nil
 	}
 
-	err = json.Unmarshal(slByte, &slStorage)
+	err = json.Unmarshal(slByte, &fullData)
 	if err != nil {
-		return slStorage, fmt.Errorf("unable to unmarshal data: %w", err)
+		return fullData, fmt.Errorf("unable to unmarshal data: %w", err)
 	}
 
-	return slStorage, nil
+	return fullData, nil
 }
 
-func (r *LinksRepository) Write(data []model.LinkData) error {
+func (r *LinksRepositoryFile) Write(data FullData) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -142,20 +149,20 @@ func slContains(shortURL string, slLinkData []model.LinkData) (model.LinkData, b
 }
 
 // PingDB returns ping info from db.
-func (r *LinksRepository) PingDB(_ context.Context) error {
+func (r *LinksRepositoryFile) PingDB(_ context.Context) error {
 	return nil
 }
 
 // SelectUserLinks selects user links by userID.
-func (r *LinksRepository) SelectUserLinks(_ context.Context, userID model.UserID) ([]model.LinkData, error) {
+func (r *LinksRepositoryFile) SelectUserLinks(_ context.Context, userID model.UserID) ([]model.LinkData, error) {
 	lds := make([]model.LinkData, 0)
 
-	slStorage, err := r.Read()
+	data, err := r.Read()
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("SelectUserLinks: %w", err)
 	}
 
-	for _, linkData := range slStorage {
+	for _, linkData := range data.Links {
 		if linkData.UserID == userID {
 			lds = append(lds, linkData)
 		}
@@ -165,6 +172,22 @@ func (r *LinksRepository) SelectUserLinks(_ context.Context, userID model.UserID
 }
 
 // CreateUser creates user.
-func (r *LinksRepository) CreateUser(_ context.Context) (string, error) {
-	return "", nil
+func (r *LinksRepositoryFile) CreateUser(_ context.Context, userID model.UserID) (model.User, error) {
+	data, err := r.Read()
+	if err != nil {
+		return model.User{}, fmt.Errorf("SelectUserLinks: %w", err)
+	}
+	user := model.User{ID: model.UserID(userID)}
+	data.Users[user.ID] = user
+
+	go func() {
+		if err := r.Write(data); err != nil {
+			logger.Sugar.Errorf("unable to save file: %w", err)
+		}
+	}()
+	return user, nil
+}
+
+func (r *LinksRepositoryFile) BatchMarkAsDeleted(ctx context.Context, links []model.LinkData) (int, error) {
+	return 0, nil
 }

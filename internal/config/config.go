@@ -18,6 +18,7 @@ type StartupFlagsParser interface {
 	GetLogLevel() string
 	GetLocalStorage() string
 	GetDatabaseConf() (dbconf.DBConfigurer, error)
+	GetSecretKey() string
 }
 
 // StartupFlags app startup flags.
@@ -28,6 +29,7 @@ type StartupFlags struct {
 	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
 	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
+	SecretKey     string `env:"SECRET_KEY"`
 }
 
 // GetServerAddress returns ServerAddress.
@@ -53,6 +55,10 @@ func (sf *StartupFlags) GetLogLevel() string {
 // GetLocalStorage returns LogLevel.
 func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
+}
+
+func (sf *StartupFlags) GetSecretKey() string {
+	return sf.SecretKey
 }
 
 // GetDatabaseConf returns pointer to dbconf.DBConfigurer or nil.
