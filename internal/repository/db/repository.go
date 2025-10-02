@@ -292,6 +292,10 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 		}
 	}
 
+	if err := rows.Err(); err != nil {
+		return user, fmt.Errorf("rows scanning users: %w", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		return user, fmt.Errorf("committing insertion error: %w", err)
 	}
