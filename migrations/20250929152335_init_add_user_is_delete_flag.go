@@ -40,16 +40,16 @@ func upInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("up transfer existing users error: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx,
-		`ALTER TABLE links
-			ADD CONSTRAINT fk_user_id
-			FOREIGN KEY (user_id)
-			REFERENCES users (id)
-			ON DELETE CASCADE
-			ON UPDATE NO ACTION;`)
-	if err != nil {
-		return fmt.Errorf("up added fk users error: %w", err)
-	}
+	// _, err = tx.ExecContext(ctx,
+	// 	`ALTER TABLE links
+	// 		ADD CONSTRAINT fk_user_id
+	// 		FOREIGN KEY (user_id)
+	// 		REFERENCES users (id)
+	// 		ON DELETE CASCADE
+	// 		ON UPDATE NO ACTION;`)
+	// if err != nil {
+	// 	return fmt.Errorf("up added fk users error: %w", err)
+	// }
 
 	return nil
 }
@@ -61,12 +61,12 @@ func downInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 		return fmt.Errorf("down drop column is_deleted error: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx,
-		`ALTER TABLE links
-		 DROP CONSTRAINT fk_user_id;`)
-	if err != nil {
-		return fmt.Errorf("down CONSTRAINT fk_user_id links error: %w", err)
-	}
+	// _, err = tx.ExecContext(ctx,
+	// 	`ALTER TABLE links
+	// 	 DROP CONSTRAINT fk_user_id;`)
+	// if err != nil {
+	// 	return fmt.Errorf("down CONSTRAINT fk_user_id links error: %w", err)
+	// }
 
 	_, err = tx.ExecContext(ctx,
 		`ALTER TABLE IF EXISTS links
