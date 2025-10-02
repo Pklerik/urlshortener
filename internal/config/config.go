@@ -57,6 +57,7 @@ func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
 }
 
+// GetSecretKey returns SecretKey.
 func (sf *StartupFlags) GetSecretKey() string {
 	return sf.SecretKey
 }

@@ -36,3 +36,4 @@ local_storage*
 
 # logging
 logfile
+**/*.log

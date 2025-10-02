@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -31,16 +32,18 @@ type SlReqPostBatch []ReqPostBatch
 
 // String (reqSl *SlReqPostBatch) returns string representation of interface realization.
 func (reqSl *SlReqPostBatch) String() string {
-	var res = "["
+	buf := bytes.Buffer{}
 	for _, req := range *reqSl {
-		res += fmt.Sprintf("ReqPostBatch{CorrelationID: %s, LongURL: %s}", req.CorrelationID, req.LongURL)
+		buf.Write([]byte(fmt.Sprintf("ReqPostBatch{CorrelationID: %s, LongURL: %s}", req.CorrelationID, req.LongURL)))
 	}
 
-	return fmt.Sprint(reqSl, "]")
+	return fmt.Sprint("[", buf.String(), "]")
 }
 
+// ShortUrls contain slice of short urls.
 type ShortUrls []string
 
+// String() returns string representation of interface realization.
 func (us *ShortUrls) String() string {
 	return fmt.Sprintf(`Urls{"%s"}`, strings.Join(*us, `", "`))
 }

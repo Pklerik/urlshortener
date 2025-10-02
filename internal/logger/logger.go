@@ -27,7 +27,7 @@ func Initialize(level string) error {
 		Level:            lvl,
 		Development:      false,
 		Encoding:         "json",
-		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
 		OutputPaths:      []string{"stdout"},
 		ErrorOutputPaths: []string{"stderr"},
 	}

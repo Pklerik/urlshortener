@@ -55,8 +55,6 @@ func NewLinkHandler(userService service.LinkServicer, args config.StartupFlagsPa
 
 // Get returns Handler for URLs registration for GET method.
 func (lh *LinkHandle) Get(w http.ResponseWriter, r *http.Request) {
-	logger.Sugar.Infof(`Full request: %#v`, *r)
-
 	ld, err := lh.service.GetShort(r.Context(), chi.URLParam(r, "shortURL"))
 	if err != nil {
 		logger.Sugar.Infof(`Unable to find long URL for short: %s: status: %d`, r.URL.Path[1:], http.StatusBadRequest)
@@ -294,6 +292,7 @@ func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteUserLinks provide realization od batch user links deletion.
 func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 	err := validators.ApplicationJSON(w, r)
 	if err != nil {
@@ -315,6 +314,7 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		batchCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		if err := lh.service.MarkAsDeleted(batchCtx, userID, req); err != nil {
 			logger.Sugar.Errorf("Failed to mark URLs as deleted: %v", err)
 		}
@@ -322,7 +322,6 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
-
 }
 
 func readReq(r *http.Request, req model.Requester) error {
@@ -356,6 +355,7 @@ func writeRes(w http.ResponseWriter, res model.Responser) error {
 	return nil
 }
 
+// AuthUser provide middleware for user authentication.
 func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 	cookieName := "auth_user"
 	authFn := func(w http.ResponseWriter, r *http.Request) {
@@ -364,12 +364,14 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		if errors.Is(err, http.ErrNoCookie) {
 			secretKey, ok := lh.service.GetSecret("SECRET_KEY")
 			if !ok {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
 			validJWT, err := jwtgenerator.BuildJWTString(
 				uuidv7.New(),
 				secretKey.(string),
@@ -388,6 +390,7 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 			}
 			r.AddCookie(cookieAuth)
 		}
+
 		http.SetCookie(w, cookieAuth)
 
 		// передаём управление хендлеру
@@ -411,10 +414,12 @@ func (lh *LinkHandle) GetUserIDFromCookie(w http.ResponseWriter, r *http.Request
 		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
 	}
+
 	secretKey, ok := lh.service.GetSecret("SECRET_KEY")
 	if !ok {
 		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
 	}
+
 	userID, err := jwtgenerator.GetUserID(secretKey.(string), authCookie.Value)
 	if err != nil {
 		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
@@ -422,6 +427,8 @@ func (lh *LinkHandle) GetUserIDFromCookie(w http.ResponseWriter, r *http.Request
 
 		return model.UserID(userID.String()), ErrUnauthorizedUser
 	}
+
+	logger.Sugar.Infof("UserID : %v", userID)
 
 	return model.UserID(model.UUIDv7(userID.String())), nil
 }

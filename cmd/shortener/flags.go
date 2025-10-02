@@ -12,11 +12,11 @@ import (
 
 func parseFlags() config.StartupFlagsParser {
 	// Set default vars
-
 	secretKey, err := random.RandBytes(32)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	parsedArgs := new(config.StartupFlags)
 	parsedArgs.ServerAddress = new(config.Address)
 	parsedArgs.DBConf = new(dbconf.Conf)

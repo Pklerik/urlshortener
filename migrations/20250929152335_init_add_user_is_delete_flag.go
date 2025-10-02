@@ -18,6 +18,7 @@ func upInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("up add column is_deleted error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`ALTER TABLE IF EXISTS links
 		ALTER COLUMN user_id 
@@ -25,17 +26,20 @@ func upInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("up alter column user_id error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY);`)
 	if err != nil {
 		return fmt.Errorf("up create table users error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO users (id) SELECT user_id FROM links;`)
 	if err != nil {
 		return fmt.Errorf("up transfer existing users error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`ALTER TABLE links
 			ADD CONSTRAINT fk_user_id
@@ -46,6 +50,7 @@ func upInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("up added fk users error: %w", err)
 	}
+
 	return nil
 }
 
@@ -55,6 +60,7 @@ func downInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("down drop column is_deleted error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`ALTER TABLE links
 		 DROP CONSTRAINT fk_user_id;`)
@@ -69,10 +75,12 @@ func downInitAddUserIsDeleteFlag(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return fmt.Errorf("down alter column user_id error: %w", err)
 	}
+
 	_, err = tx.ExecContext(ctx,
 		`DROP TABLE IF EXISTS users CASCADE;`)
 	if err != nil {
 		return fmt.Errorf("down create table users error: %w", err)
 	}
+
 	return nil
 }

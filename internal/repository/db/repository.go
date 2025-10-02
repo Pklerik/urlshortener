@@ -142,9 +142,9 @@ func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
 	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
 }
 
-// TODO  collectLinks(rows *sql.Rows, data *any, items ...any) (int, error)
+// collectLinks(rows *sql.Rows, data *any, items ...any) (int, error)
 // provide unification for rows scanning
-// return number of inserted rows and error
+// return number of inserted rows and error.
 func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 	linksData := make([]model.LinkData, 0, 1)
 	for rows.Next() {
@@ -166,10 +166,10 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 	return linksData, nil
 }
 
-// TODO  collectIds(rows *sql.Rows, data *any, items ...any) (int, error)
+// collectIDs(rows *sql.Rows, data *any, items ...any) (int, error)
 // provide unification for rows scanning
 // return number of inserted rows and error
-func collectIds(rows *sql.Rows) ([]model.UUIDv7, error) {
+func collectIDs(rows *sql.Rows) ([]model.UUIDv7, error) {
 	ids := make([]model.UUIDv7, 0, 1)
 	for rows.Next() {
 		var id model.UUIDv7
@@ -267,6 +267,7 @@ func (r *LinksRepositoryPostgres) SelectUserLinks(ctx context.Context, userID mo
 // CreateUser creates user.
 func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.UserID) (model.User, error) {
 	user := model.User{ID: userID}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return user, fmt.Errorf("error creating tx error: %w", err)
@@ -277,6 +278,7 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 	if err != nil {
 		return user, fmt.Errorf("error selecting link data: %w", err)
 	}
+
 	for rows.Next() {
 		err := rows.Scan(&user.ID)
 		if err != nil {
@@ -289,6 +291,7 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 			return user, fmt.Errorf("collect users: %w", err)
 		}
 	}
+
 	if err := tx.Commit(); err != nil {
 		return user, fmt.Errorf("committing insertion error: %w", err)
 	}
@@ -296,46 +299,58 @@ func (r *LinksRepositoryPostgres) CreateUser(ctx context.Context, userID model.U
 	return user, nil
 }
 
-func (r *LinksRepositoryPostgres) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, linkCh chan model.LinkData) error {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		logger.Sugar.Errorf("error creating tx error: %w", err)
-
-		return fmt.Errorf("error creating tx error: %w", err)
-	}
-
-	batchSize := 10
+// BatchMarkAsDeleted delete all links provided by linkCh chan model.LinkData.
+func (r *LinksRepositoryPostgres) BatchMarkAsDeleted(ctx context.Context, linkCh chan model.LinkData) error {
+	batchSize := 20
 	batch := make([]model.UUIDv7, 0, batchSize)
-	logger.Sugar.Infof("batch size: %d", batchSize)
 
-	defer tx.Rollback()
 	for linkData := range linkCh {
 		select {
 		case <-ctx.Done():
 			goto last
-		case <-linkCh:
+		default:
 			batch = append(batch, linkData.UUID)
 		}
+
 		if len(batch) == batchSize {
-			logger.Sugar.Infof("Proceed batch: %d", len(batch))
-			proceedBatch(ctx, tx, batch)
+			items, err := proceedBatch(ctx, r.db, batch)
+			if err != nil {
+				logger.Sugar.Errorf("Error during batch: %w", err)
+			}
+
+			logger.Sugar.Infof("Updated <%d> items", items)
+
+			batch = make([]model.UUIDv7, 0, batchSize)
 		}
 	}
+
 last:
-	logger.Sugar.Infof("Proceed batch last time: %d", len(batch))
-	proceedBatch(ctx, tx, batch)
-	tx.Commit()
+	items, err := proceedBatch(ctx, r.db, batch)
+
+	if err != nil {
+		logger.Sugar.Errorf("Error during batch: %w", err)
+	}
+
+	logger.Sugar.Infof("Proceed batch last time: %d", items)
 
 	return nil
 }
 
-func proceedBatch(ctx context.Context, tx *sql.Tx, ids []model.UUIDv7) (int, error) {
+func proceedBatch(ctx context.Context, db *sql.DB, ids []model.UUIDv7) (int, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		logger.Sugar.Errorf("error creating tx error: %w", err)
+
+		return 0, fmt.Errorf("error creating tx error: %w", err)
+	}
+	defer tx.Rollback()
 
 	idsString := fmt.Sprintf("'%s'", func(ids []model.UUIDv7) string {
 		idStr := make([]string, 0, len(ids))
 		for _, id := range ids {
 			idStr = append(idStr, string(id))
 		}
+
 		return strings.Join(idStr, "', '")
 	}(ids))
 	query := fmt.Sprintf(`UPDATE links AS t
@@ -344,31 +359,22 @@ func proceedBatch(ctx context.Context, tx *sql.Tx, ids []model.UUIDv7) (int, err
 		WHERE
 			id IN (%s)
 		RETURNING id;`, idsString)
-	// var (
-	// 	queryArgs    = make([]interface{}, 0, 4*len(links))
-	// 	placeholders = make([]string, 0, 4*len(links))
-	// )
-	// for pgi, linkData := range links {
-	// 	placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
-	// 	queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserID)
-	// 	logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserID)
-	// }
 
-	// return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
-	// strIds := func(ids []model.UUIDv7) []string {
-	// 	strIds := make([]string, 0, len(ids))
-	// 	for _, id := range ids {
-	// 		strIds = append(strIds, string(id))
-	// 	}
-	// 	return strIds
-	// }(ids)
 	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return 0, fmt.Errorf("error selecting link data: %w", err)
 	}
-	deletedIDs, err := collectIds(rows)
+
+	if err := tx.Commit(); err != nil {
+		logger.Sugar.Errorf("error committing tx error: %w", err)
+
+		return 0, fmt.Errorf("error committing tx error: %w", err)
+	}
+
+	deletedIDs, err := collectIDs(rows)
 	if err != nil {
 		return 0, fmt.Errorf("error selecting link data: %w", err)
 	}
+
 	return len(deletedIDs), err
 }

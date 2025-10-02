@@ -23,6 +23,7 @@ type LinksRepositoryFile struct {
 	mu   sync.RWMutex
 }
 
+// FullData - all service data.
 type FullData struct {
 	Links []model.LinkData            `json:"links"`
 	Users map[model.UserID]model.User `json:"users"`
@@ -102,13 +103,15 @@ func (r *LinksRepositoryFile) Read() (FullData, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var fullData FullData = FullData{
+	fullData := FullData{
 		Users: make(map[model.UserID]model.User, dictionary.MapSize),
 	}
+
 	slByte, err := os.ReadFile(r.File)
 	if err != nil {
 		return fullData, fmt.Errorf("unable to open file: %w", err)
 	}
+
 	if len(slByte) == 0 {
 		return fullData, nil
 	}
@@ -177,7 +180,8 @@ func (r *LinksRepositoryFile) CreateUser(_ context.Context, userID model.UserID)
 	if err != nil {
 		return model.User{}, fmt.Errorf("SelectUserLinks: %w", err)
 	}
-	user := model.User{ID: model.UserID(userID)}
+
+	user := model.User{ID: userID}
 	data.Users[user.ID] = user
 
 	go func() {
@@ -185,9 +189,11 @@ func (r *LinksRepositoryFile) CreateUser(_ context.Context, userID model.UserID)
 			logger.Sugar.Errorf("unable to save file: %w", err)
 		}
 	}()
+
 	return user, nil
 }
 
-func (r *LinksRepositoryFile) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error {
+// BatchMarkAsDeleted not implemented.
+func (r *LinksRepositoryFile) BatchMarkAsDeleted(_ context.Context, _ chan model.LinkData) error {
 	return nil
 }

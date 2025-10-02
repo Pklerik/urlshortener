@@ -83,13 +83,17 @@ func (r *LinksRepositoryMemory) SelectUserLinks(_ context.Context, userID model.
 func (r *LinksRepositoryMemory) CreateUser(_ context.Context, userID model.UserID) (model.User, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	user := model.User{ID: model.UserID(userID)}
+
+	user := model.User{ID: userID}
 	r.Users = append(r.Users, user)
+
 	return user, nil
 }
 
-func (r *LinksRepositoryMemory) BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error {
+// BatchMarkAsDeleted not implemented.
+func (r *LinksRepositoryMemory) BatchMarkAsDeleted(_ context.Context, _ chan model.LinkData) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	return nil
 }

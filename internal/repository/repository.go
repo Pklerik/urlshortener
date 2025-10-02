@@ -27,7 +27,7 @@ type LinksRepository interface {
 	SetLinks(ctx context.Context, links []model.LinkData) ([]model.LinkData, error)
 	FindShort(ctx context.Context, short string) (model.LinkData, error)
 	SelectUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error)
-	BatchMarkAsDeleted(ctx context.Context, userID model.UserID, links chan model.LinkData) error
+	BatchMarkAsDeleted(ctx context.Context, links chan model.LinkData) error
 	CreateUser(ctx context.Context, userID model.UserID) (model.User, error)
 	PingDB(ctx context.Context) error
 }

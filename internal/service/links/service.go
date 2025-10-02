@@ -35,6 +35,7 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string,
 	if ctx.Err() != nil {
 		return nil, fmt.Errorf("RegisterLink context error: %w", ctx.Err())
 	}
+
 	user, err := ls.repo.CreateUser(ctx, userID)
 	if err != nil {
 		return []model.LinkData{}, fmt.Errorf("(ls *LinkService) RegisterLink: %w", err)
@@ -118,37 +119,29 @@ func (ls *BaseLinkService) ProvideUserLinks(ctx context.Context, userID model.Us
 	return lds, nil
 }
 
+// MarkAsDeleted - mark links as is_deleted.
 func (ls *BaseLinkService) MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) error {
 	userLinks, err := ls.repo.SelectUserLinks(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("MarkAsDeleted: %w", err)
 	}
 
-	// канал с данными на вход
+	// chan with input data
 	inputCh := deletionLinksGenerator(ctx, userLinks)
-	logger.Sugar.Infof("Create delete generator")
-	// получаем слайс каналов из 10 рабочих linkForDeletion.
+
+	// slice of channels for parallel work size of gomaxpoc.
 	channels := fanOutDeletionLinks(ctx, inputCh, shortLinks)
-	logger.Sugar.Infof("Create delete fun out pattern")
 
-	// а теперь объединяем десять каналов в один
+	// collect all channels to 1.
 	addResultCh := funInDeletionLinks(ctx, channels...)
-	logger.Sugar.Infof("Create delete fun in pattern")
 
-	return ls.repo.BatchMarkAsDeleted(ctx, userID, addResultCh)
+	err = ls.repo.BatchMarkAsDeleted(ctx, addResultCh)
+	if err != nil {
+		return fmt.Errorf("MarkAsDeleted: %w", err)
+	}
+
+	return nil
 }
-
-// // DeleteUserLinks deletes user links by shortUrls.
-// // Returns num of deleted links and error.
-// func (ls *BaseLinkService) DeleteUserLinks(ctx context.Context, shortLinks *model.ShortUrls) (int, error) {
-
-// 	// signal chanel for goroutines closure.
-// 	doneCh := make(chan struct{})
-// 	// close if service done working
-// 	defer close(doneCh)
-
-// 	return nil
-// }
 
 func linkForDeletion(ctx context.Context, userLinkCh chan model.LinkData, inputLinks model.ShortUrls) chan model.LinkData {
 	linksForDeletionCh := make(chan model.LinkData)
@@ -156,10 +149,12 @@ func linkForDeletion(ctx context.Context, userLinkCh chan model.LinkData, inputL
 	go func() {
 		// откладываем сообщение о том, что горутина завершилась
 		defer close(linksForDeletionCh)
+
 		for ul := range userLinkCh {
 			if !slices.Contains(inputLinks, ul.ShortURL) {
 				continue
 			}
+
 			select {
 			case <-ctx.Done():
 				return
@@ -171,7 +166,7 @@ func linkForDeletion(ctx context.Context, userLinkCh chan model.LinkData, inputL
 	return linksForDeletionCh
 }
 
-// generator функция из предыдущего примера, делает то же, что и делала
+// generator функция из предыдущего примера, делает то же, что и делала.
 func deletionLinksGenerator(ctx context.Context, links []model.LinkData) chan model.LinkData {
 	inputCh := make(chan model.LinkData)
 
@@ -190,7 +185,7 @@ func deletionLinksGenerator(ctx context.Context, links []model.LinkData) chan mo
 	return inputCh
 }
 
-// fanOut принимает канал данных, порождает 10 горутин
+// fanOut принимает канал данных, порождает 10 горутин.
 func fanOutDeletionLinks(ctx context.Context, inputCh chan model.LinkData, inputLinks model.ShortUrls) []chan model.LinkData {
 	// количество горутин add
 	numWorkers := runtime.GOMAXPROCS(0)
@@ -251,6 +246,7 @@ func funInDeletionLinks(ctx context.Context, resultChs ...chan model.LinkData) c
 	return finalCh
 }
 
+// GetSecret provide secret key from service.
 func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
 	switch name {
 	case "SECRET_KEY":
