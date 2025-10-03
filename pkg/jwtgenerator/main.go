@@ -18,6 +18,15 @@ var (
 	ErrTokenValidation = errors.New("error token validation")
 )
 
+// ErrSigningMethodNotHMAC - error signing method not hmac
+type ErrSigningMethodNotHMAC struct {
+	headerAlg string
+}
+
+func (e ErrSigningMethodNotHMAC) Error() string {
+	return fmt.Sprint("error signing method not hmac: method:", e.headerAlg)
+}
+
 // Claims — структура утверждений, которая включает стандартные утверждения и
 // одно пользовательское UserID.
 type Claims struct {
@@ -56,7 +65,7 @@ func GetUserID(secretKey string, jwtToken string) (uuidv7.UUID, error) {
 
 	token, err := jwt.ParseWithClaims(jwtToken, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			return nil, ErrSigningMethodNotHMAC{headerAlg: fmt.Sprintf("%s", t.Header["alg"])}
 		}
 
 		return []byte(secretKey), nil
