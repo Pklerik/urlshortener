@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sync"
 
-	//nolint
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -72,7 +71,6 @@ func (ls *BaseLinkService) RegisterLinks(ctx context.Context, longURLs []string,
 
 // cutURL - provide shortURl based on Long.
 func (ls *BaseLinkService) cutURL(_ context.Context, longURL string) (string, error) {
-	//nolint
 	h := sha256.New()
 
 	_, err := io.WriteString(h, longURL)

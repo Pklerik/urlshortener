@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	//nolint
-
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
 	"github.com/Pklerik/urlshortener/internal/logger"

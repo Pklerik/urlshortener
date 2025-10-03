@@ -168,7 +168,7 @@ func collectLinks(rows *sql.Rows) ([]model.LinkData, error) {
 
 // collectIDs(rows *sql.Rows, data *any, items ...any) (int, error)
 // provide unification for rows scanning
-// return number of inserted rows and error
+// return number of inserted rows and error.
 func collectIDs(rows *sql.Rows) ([]model.UUIDv7, error) {
 	ids := make([]model.UUIDv7, 0, 1)
 	for rows.Next() {
@@ -349,22 +349,21 @@ func proceedBatch(ctx context.Context, db *sql.DB, ids []model.UUIDv7) (int, err
 	}
 	defer tx.Rollback()
 
-	idsString := fmt.Sprintf("'%s'", func(ids []model.UUIDv7) string {
-		idStr := make([]string, 0, len(ids))
-		for _, id := range ids {
-			idStr = append(idStr, string(id))
-		}
+	// Создаём плейсхолдеры для prepared statement
+	placeholders := make([]string, len(ids))
 
-		return strings.Join(idStr, "', '")
-	}(ids))
-	query := fmt.Sprintf(`UPDATE links AS t
-		SET
-			is_deleted = true
-		WHERE
-			id IN (%s)
-		RETURNING id;`, idsString)
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = string(id)
+	}
 
-	rows, err := tx.QueryContext(ctx, query)
+	query := fmt.Sprintf(`UPDATE links 
+		SET is_deleted = true 
+		WHERE id IN (%s)
+		RETURNING id;`, strings.Join(placeholders, ", "))
+
+	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("error selecting link data: %w", err)
 	}

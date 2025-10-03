@@ -2,20 +2,15 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/goccy/go-json"
-	"github.com/samborkent/uuidv7"
-
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
-	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
@@ -39,7 +34,7 @@ type LinkHandler interface {
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
 	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
 	AuthUser(next http.Handler) http.Handler
-	GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error)
+	GetUserIDFromCookie(r *http.Request) (model.UserID, error)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -94,14 +89,22 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := lh.GetUserIDFromCookie(w, r)
-	if err != nil {
+	userID, err := lh.GetUserIDFromCookie(r)
+	if err != nil && !errors.Is(err, ErrUnauthorizedUser) {
+		logger.Sugar.Errorf(`authorize service error: %d`, http.StatusInternalServerError)
+		http.Error(w, `Unauthorized`, http.StatusInternalServerError)
+
 		return
+	}
+
+	if errors.Is(err, ErrUnauthorizedUser) {
+		logger.Sugar.Errorf(`Unauthorized: status: %d`, http.StatusBadRequest)
+		http.Error(w, `Unauthorized`, http.StatusUnauthorized)
 	}
 
 	lds, err := lh.service.RegisterLinks(r.Context(), []string{string(body)}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
-		logger.Sugar.Infof(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
+		logger.Sugar.Errorf(`Unable to shorten URL: status: %d`, http.StatusBadRequest)
 		http.Error(w, `Unable to shorten URL`, http.StatusBadRequest)
 
 		return
@@ -140,7 +143,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -218,7 +221,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -252,7 +255,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 // GetUserLinks for handle get request for user data.
 func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
-	userID, err := lh.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -305,7 +308,7 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(w, r)
+	userID, err := lh.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -322,113 +325,4 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
-}
-
-func readReq(r *http.Request, req model.Requester) error {
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		logger.Log.Debug("cannot read body", zap.Error(err))
-		return fmt.Errorf("(req *Request) Read: cannot read body: %w", err)
-	}
-
-	reader := io.NopCloser(bytes.NewReader(body))
-
-	dec := json.NewDecoder(reader)
-	if err := dec.Decode(req); err != nil {
-		logger.Log.Debug("cannot decode request JSON body", zap.Error(err))
-		return fmt.Errorf("(req *Request) Read: cannot decode request JSON body: %w", err)
-	}
-
-	return nil
-}
-
-func writeRes(w http.ResponseWriter, res model.Responser) error {
-	enc := json.NewEncoder(w)
-	logger.Sugar.Debugf("Head: %v", w.Header())
-
-	if err := enc.Encode(res); err != nil {
-		return fmt.Errorf("writing Response type: %T, value: %v, error: %w ", res, res, err)
-	}
-
-	return nil
-}
-
-// AuthUser provide middleware for user authentication.
-func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
-	cookieName := "auth_user"
-	authFn := func(w http.ResponseWriter, r *http.Request) {
-		cookieAuth, err := r.Cookie(cookieName)
-		if err != nil && !errors.Is(err, http.ErrNoCookie) {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		if errors.Is(err, http.ErrNoCookie) {
-			secretKey, ok := lh.service.GetSecret("SECRET_KEY")
-			if !ok {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			validJWT, err := jwtgenerator.BuildJWTString(
-				uuidv7.New(),
-				secretKey.(string),
-			)
-			if err != nil {
-				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
-				logger.Sugar.Errorf("Unable to generete JWT: %w", err)
-
-				return
-			}
-
-			cookieAuth = &http.Cookie{
-				Name:  cookieName,
-				Value: validJWT,
-				Path:  "/",
-			}
-			r.AddCookie(cookieAuth)
-		}
-
-		http.SetCookie(w, cookieAuth)
-
-		// передаём управление хендлеру
-		next.ServeHTTP(w, r)
-	}
-
-	return http.HandlerFunc(authFn)
-}
-
-// GetUserIDFromCookie provide userId auth info.
-func (lh *LinkHandle) GetUserIDFromCookie(w http.ResponseWriter, r *http.Request) (model.UserID, error) {
-	authCookie, err := r.Cookie("auth_user")
-	if errors.Is(err, http.ErrNoCookie) {
-		logger.Sugar.Infof(`Unable to find auth_user cookie: %d`, http.StatusUnauthorized)
-		http.Error(w, `Unable to find auth_user cookie`, http.StatusUnauthorized)
-
-		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
-	}
-
-	if err != nil {
-		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
-		http.Error(w, `Unable to get cookie`, http.StatusInternalServerError)
-	}
-
-	secretKey, ok := lh.service.GetSecret("SECRET_KEY")
-	if !ok {
-		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
-	}
-
-	userID, err := jwtgenerator.GetUserID(secretKey.(string), authCookie.Value)
-	if err != nil {
-		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
-		http.Error(w, `Unable to shorten URL`, http.StatusUnauthorized)
-
-		return model.UserID(userID.String()), ErrUnauthorizedUser
-	}
-
-	logger.Sugar.Infof("UserID : %v", userID)
-
-	return model.UserID(model.UUIDv7(userID.String())), nil
 }

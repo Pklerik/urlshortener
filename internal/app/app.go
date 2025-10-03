@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 
-	//nolint
+	//nolint необходимо получать SIGTERM для остановки процесса.
 	"syscall"
 
 	"github.com/Pklerik/urlshortener/internal/config"

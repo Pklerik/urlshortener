@@ -4,8 +4,6 @@ package service
 import (
 	"context"
 
-	//nolint
-
 	"errors"
 
 	"github.com/Pklerik/urlshortener/internal/model"

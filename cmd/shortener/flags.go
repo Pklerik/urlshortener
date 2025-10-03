@@ -55,10 +55,7 @@ func parseFlags() config.StartupFlagsParser {
 	if envArgs.SecretKey != "" {
 		parsedArgs.SecretKey = envArgs.SecretKey
 	} else {
-		parsedArgs.SecretKey, err = random.RandBytes(32)
-		if err != nil {
-			log.Fatal(err)
-		}
+		parsedArgs.SecretKey = secretKey
 	}
 
 	return parsedArgs
