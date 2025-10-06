@@ -1,0 +1,47 @@
+// Package links provide all business logic for links shortening app.
+package links
+
+import (
+	"context"
+	"reflect"
+	"testing"
+
+	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/internal/repository"
+	"github.com/Pklerik/urlshortener/internal/repository/inmemory"
+)
+
+func TestBaseLinkService_RegisterLinks(t *testing.T) {
+	logger.Initialize("DEBUG")
+	type fields struct {
+		linksRepo repository.LinksRepository
+	}
+	type args struct {
+		ctx      context.Context
+		longURLs []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{name: "Base", fields: fields{linksRepo: inmemory.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ls := NewLinksService(tt.fields.linksRepo, "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs=")
+			gots, err := ls.RegisterLinks(tt.args.ctx, tt.args.longURLs, "0199996a-fd98-780c-b5aa-1aef966fb36e0")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("BaseLinkService.RegisterLinks() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			for _, got := range gots {
+				if !reflect.DeepEqual(got.ShortURL, tt.want) {
+					t.Errorf("BaseLinkService.RegisterLinks() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}

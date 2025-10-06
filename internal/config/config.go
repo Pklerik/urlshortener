@@ -1,37 +1,35 @@
+// Package config provide all app configs.
 package config
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 )
 
 // StartupFlagsParser provide interface for app flags.
 type StartupFlagsParser interface {
-	GetFlags() string
 	GetServerAddress() Address
 	GetAddressShortURL() string
-	GetTimeout() float64
+	GetTimeout() time.Duration
 	GetLogLevel() string
 	GetLocalStorage() string
+	GetDatabaseConf() (dbconf.DBConfigurer, error)
+	GetSecretKey() string
 }
 
 // StartupFlags app startup flags.
 type StartupFlags struct {
-	ServerAddress *Address `env:"SERVER_ADDRESS"`
-	BaseURL       string   `env:"BASE_URL"`
-	LogLevel      string   `env:"LOG_LEVEL"`
-	LocalStorage  string   `env:"FILE_STORAGE_PATH"`
+	ServerAddress *Address     `env:"SERVER_ADDRESS"`
+	BaseURL       string       `env:"BASE_URL"`
+	LogLevel      string       `env:"LOG_LEVEL"`
+	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
+	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
-}
-
-// GetFlags provide string representation of flag.
-func (sf *StartupFlags) GetFlags() string {
-	return fmt.Sprintf("ServerAddress: %s, AddressShortURL: %s, Timeout: %f",
-		sf.ServerAddress.String(),
-		sf.BaseURL,
-		sf.Timeout,
-	)
+	SecretKey     string `env:"SECRET_KEY"`
 }
 
 // GetServerAddress returns ServerAddress.
@@ -45,8 +43,8 @@ func (sf *StartupFlags) GetAddressShortURL() string {
 }
 
 // GetTimeout returns GetTimeout.
-func (sf *StartupFlags) GetTimeout() float64 {
-	return sf.Timeout
+func (sf *StartupFlags) GetTimeout() time.Duration {
+	return time.Duration(sf.Timeout * float64(time.Second))
 }
 
 // GetLogLevel returns LogLevel.
@@ -57,6 +55,24 @@ func (sf *StartupFlags) GetLogLevel() string {
 // GetLocalStorage returns LogLevel.
 func (sf *StartupFlags) GetLocalStorage() string {
 	return sf.LocalStorage
+}
+
+// GetSecretKey returns SecretKey.
+func (sf *StartupFlags) GetSecretKey() string {
+	return sf.SecretKey
+}
+
+// GetDatabaseConf returns pointer to dbconf.DBConfigurer or nil.
+func (sf *StartupFlags) GetDatabaseConf() (dbconf.DBConfigurer, error) {
+	if sf.DBConf == nil {
+		return nil, dbconf.ErrEmptyDatabaseConfig
+	}
+
+	if err := sf.DBConf.Valid(); err != nil {
+		return nil, fmt.Errorf("GetDatabaseConf: %w", err)
+	}
+
+	return sf.DBConf, nil
 }
 
 // Address base struct.

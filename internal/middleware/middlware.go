@@ -1,5 +1,5 @@
-// Package internalmiddleware provide decorators for handlers.
-package internalmiddleware
+// Package middleware provide decorators for handlers.
+package middleware
 
 import (
 	"compress/gzip"
@@ -10,6 +10,12 @@ import (
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"github.com/Pklerik/urlshortener/pkg/random"
+)
+
+var (
+	// SecretKey is generated secret key, which will be recreates each time service is starting.
+	SecretKey, _ = random.RandBytes(32)
 )
 
 type (
@@ -121,6 +127,7 @@ func GZIPMiddleware(next http.Handler) http.Handler {
 		// передаём управление хендлеру
 		next.ServeHTTP(ow, r)
 	}
+
 	return http.HandlerFunc(fn)
 }
 

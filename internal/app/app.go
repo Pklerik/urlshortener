@@ -8,9 +8,8 @@ import (
 	"os/signal"
 	"strconv"
 
-	//nolint
+	//nolint необходимо получать SIGTERM для остановки процесса.
 	"syscall"
-	"time"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -32,11 +31,18 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	argPort := ":" + strconv.Itoa(parsedArgs.GetServerAddress().Port)
 	logger.Sugar.Infof("Setup server with args: port: %s", argPort)
+
+	routerHandler, err := router.ConfigureRouter(ctx, parsedArgs)
+	if err != nil {
+		logger.Sugar.Errorf("Unable to start server: %w", err)
+		return
+	}
+
 	httpServer := &http.Server{
 		Addr:         argPort,
-		Handler:      router.ConfigureRouter(parsedArgs),
-		ReadTimeout:  time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
-		WriteTimeout: time.Duration(parsedArgs.GetTimeout() * float64(time.Second)),
+		Handler:      routerHandler,
+		ReadTimeout:  parsedArgs.GetTimeout(),
+		WriteTimeout: parsedArgs.GetTimeout(),
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)

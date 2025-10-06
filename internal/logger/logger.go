@@ -22,12 +22,18 @@ func Initialize(level string) error {
 	if err != nil {
 		return fmt.Errorf("Initialize: %w", err)
 	}
-	// создаём новую конфигурацию логера
-	cfg := zap.NewProductionConfig()
-	// устанавливаем уровень
-	cfg.Level = lvl
+
+	config := zap.Config{
+		Level:            lvl,
+		Development:      false,
+		Encoding:         "json",
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+
 	// создаём логер на основе конфигурации
-	zl, err := cfg.Build()
+	zl, err := config.Build()
 	if err != nil {
 		return fmt.Errorf("Initialize: %w", err)
 	}

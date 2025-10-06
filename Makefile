@@ -1,8 +1,12 @@
+#!make
+include .env
+export $(shell sed 's/=.*//' .env)
+
 upd_test:
 	git fetch template && git checkout template/main .github
 
 test:
-	go test -coverpkg=./... -cover -coferprofile cover.tmp.out ./...
+	go test -coverpkg=./... -cover -coverprofile cover.tmp.out ./...
 	echo "-----------------------------------------------------------------------------------"
 	cat cover.tmp.out | grep -v "main.go" > cover.out
 	go tool cover -func cover.out
@@ -42,8 +46,10 @@ check_new:
 # example make a iter=5 for run 1-5ths iteration
 at: check_new build
 	number=1 ; while [[ $$number -le $(iter) ]] ; do \
-       	sudo ~/dev/shortenertestbeta -test.v -binary-path=cmd/shortener/shortener -source-path=. -file-storage-path=local_storage.json -server-port=8080 -test.run="^TestIteration$$number$$" ; \
+       	sudo ~/dev/shortenertest_v2 -test.v -binary-path=cmd/shortener/shortener -source-path=. -file-storage-path=local_storage.json -server-port=58080 -database-dsn=${DATABASE_DSN} -test.run="^TestIteration$$number$$" ; \
 		((number = number + 1)) ; \
     done
 	echo "DONE"
 	
+repo_mock:
+	mockgen -source=internal/repository/repository.go -destination=internal/repository/mocks/mock_links_repo.go -package=mocks

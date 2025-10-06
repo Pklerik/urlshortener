@@ -21,6 +21,19 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+.review/
+
 
 # data storage
 local_storage*
+
+# local variables
+.env
+
+# DS_Store
+.DS_Store
+
+
+# logging
+logfile
+**/*.log
