@@ -2,11 +2,14 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
@@ -34,6 +37,7 @@ type LinkHandler interface {
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
 	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
 	AuthUser(next http.Handler) http.Handler
+	AuditMiddleware(next http.Handler) http.Handler
 	GetUserIDFromCookie(r *http.Request) (model.UserID, error)
 }
 
@@ -137,8 +141,15 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil && !errors.Is(err, io.EOF) {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+	}
+
 	var req model.Request
-	if err := readReq(r, &req); err != nil {
+	if err := readReq(r, body, &req); err != nil {
 		logger.Log.Debug("cannot read request", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -208,8 +219,14 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer r.Body.Close()
+	body, err := io.ReadAll(r.Body)
+	if err != nil && !errors.Is(err, io.EOF) {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+	}
+
 	var req model.SlReqPostBatch
-	if err := readReq(r, &req); err != nil {
+	if err := readReq(r, body, &req); err != nil {
 		logger.Log.Debug("cannot read request", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -301,9 +318,15 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil && !errors.Is(err, io.EOF) {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+	}
 
 	var req model.ShortUrls
-	if err := readReq(r, &req); err != nil {
+	if err := readReq(r, body, &req); err != nil {
 		logger.Log.Debug("cannot read request", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -325,4 +348,58 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
+}
+
+func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		var (
+			action string = "follow"
+			req    model.Request
+		)
+		if lh.Args.GetAudit() == nil || (lh.Args.GetAudit().GetLogFilePath() == "" && lh.Args.GetAudit().LogUrlPath == "") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/"):
+			action = "shorten"
+		case strings.HasSuffix(r.URL.Path, "/api/shorten"):
+			action = "shorten"
+		}
+
+		userID, err := lh.GetUserIDFromCookie(r)
+		if err != nil {
+			userID = model.UserID("unauthorized")
+		}
+
+		var buf bytes.Buffer
+		tee := io.TeeReader(r.Body, &buf)
+		body, err := io.ReadAll(tee)
+		if err != nil && !errors.Is(err, io.EOF) {
+			logger.Log.Debug("cannot read body", zap.Error(err))
+		}
+
+		if err := readReq(r, body, &req); err != nil {
+			logger.Log.Debug("cannot read request", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		if req.URL == "" {
+			logger.Log.Error("request is empty")
+		}
+
+		extendedLogger := logger.AuditLogger(lh.Args.GetAudit())
+		if extendedLogger == nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+		extendedLogger.Log(logger.Log.Level(), "", zap.Int64("ts", time.Now().Unix()),
+			zap.String("action", action),
+			zap.String("user_id", string(userID)),
+			zap.String("url", string(req.URL)),
+		)
+
+		next.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(fn)
 }

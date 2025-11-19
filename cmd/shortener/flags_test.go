@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/config/audit"
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 )
 
@@ -31,7 +32,12 @@ func Test_parseFlags(t *testing.T) {
 					Port:      "5432",
 					Database:  "test_db",
 					Options:   dbconf.Options{"search_path": "test_schema"},
-				}}},
+				},
+				Audit: &audit.Audit{
+					LogFilePath: "",
+					LogUrlPath:  "",
+				},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

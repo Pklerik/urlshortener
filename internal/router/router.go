@@ -59,12 +59,17 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 
 	r.Use(chimiddleware.Timeout(parsedFlags.GetTimeout()))
 
-	r.Route("/", func(r chi.Router) {
-		r.Get("/{shortURL}", linksHandler.Get)
+	r.Group(func(r chi.Router) {
+		r.Use(linksHandler.AuditMiddleware)
+
 		r.Post("/", linksHandler.PostText)
+		r.Get("/{shortURL}", linksHandler.Get)
+		r.Post("/api/shorten", linksHandler.PostJSON)
+	})
+
+	r.Route("/", func(r chi.Router) {
 		r.Route("/api", func(r chi.Router) {
 			r.Route("/shorten", func(r chi.Router) {
-				r.Post("/", linksHandler.PostJSON)
 				r.Post("/batch", linksHandler.PostBatchJSON)
 			})
 			r.Route("/user", func(r chi.Router) {
@@ -73,6 +78,12 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 			})
 		})
 		r.Get("/ping", linksHandler.PingDB)
+	})
+
+	// Use chi.Walk to print all routes
+	chi.Walk(r, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		fmt.Printf("[%s] %s\n", method, route)
+		return nil
 	})
 
 	return r, nil

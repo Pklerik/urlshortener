@@ -2,18 +2,34 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"sync"
 
+	"github.com/Pklerik/urlshortener/internal/config/audit"
+	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-// Log будет доступен всему коду как синглтон.
-// По умолчанию установлен no-op-логер, который не выводит никаких сообщений.
-var Log *zap.Logger = zap.NewNop()
+var (
+	// Log будет доступен всему коду как синглтон.
+	// По умолчанию установлен no-op-логер, который не выводит никаких сообщений.
+	Log *zap.Logger = zap.NewNop()
 
-// Sugar *zap.SugaredLogger.
-var Sugar *zap.SugaredLogger
+	// Sugar *zap.SugaredLogger.
+	Sugar *zap.SugaredLogger
+
+	config      zap.Config
+	auditLogger *zap.Logger
+	once        sync.Once
+)
 
 // Initialize инициализирует синглтон логера с необходимым уровнем логирования.
 func Initialize(level string) error {
@@ -23,7 +39,7 @@ func Initialize(level string) error {
 		return fmt.Errorf("Initialize: %w", err)
 	}
 
-	config := zap.Config{
+	config = zap.Config{
 		Level:            lvl,
 		Development:      false,
 		Encoding:         "json",
@@ -44,6 +60,10 @@ func Initialize(level string) error {
 	return nil
 }
 
+func GetConfig() zapcore.EncoderConfig {
+	return config.EncoderConfig
+}
+
 // RequestLogger — middleware-логер для входящих HTTP-запросов.
 func RequestLogger(h http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,4 +73,80 @@ func RequestLogger(h http.HandlerFunc) http.Handler {
 		)
 		h(w, r)
 	})
+}
+
+func AuditLogger(auditConf *audit.Audit) *zap.Logger {
+	once.Do(func() {
+		cores := make([]zapcore.Core, 0, 2)
+		emptyCfg := zapcore.EncoderConfig{
+			TimeKey:       "",
+			LevelKey:      "",
+			NameKey:       "",
+			CallerKey:     "",
+			MessageKey:    "",
+			StacktraceKey: "",
+		}
+		if filepath := auditConf.GetLogFilePath(); filepath != "" {
+			cores = append(cores, zapcore.NewCore(
+				zapcore.NewJSONEncoder(emptyCfg),      // Custom encoder
+				zapcore.AddSync(getLogFile(filepath)), // Sync to stdout
+				Log.Level(),                           // Use the same level as the original core
+			))
+		}
+		if auditConf.GetLogUrlPath() != "" {
+			cores = append(cores, zapcore.NewCore(
+				zapcore.NewJSONEncoder(emptyCfg),           // Custom encoder
+				zapcore.AddSync(NewAuditClient(auditConf)), // Sync to stdout
+				Log.Level(), // Use the same level as the original core
+			))
+		}
+		core := zapcore.NewTee(cores...)
+		auditLogger = zap.New(core)
+	})
+	return auditLogger
+}
+
+type AuditClient struct {
+	client    *resty.Client
+	auditConf *audit.Audit
+}
+
+func NewAuditClient(auditConf *audit.Audit) *AuditClient {
+	ac := &AuditClient{
+		client:    auditConf.GetURLWriter(),
+		auditConf: auditConf,
+	}
+	return ac
+}
+
+func (ac *AuditClient) Write(massage []byte) (int, error) {
+	buf := bytes.NewBuffer([]byte{})
+	buf.Write([]byte(massage))
+	_, err := ac.client.GetClient().Post(ac.auditConf.GetLogUrlPath(), "application-json", buf)
+
+	return len(massage), err
+}
+
+func getLogFile(filePath string) *os.File {
+	var err error
+	var fullPath string = filePath
+	// инициализируем объект
+
+	if !strings.HasPrefix(filePath, "/") {
+		ex, err := os.Executable()
+		if err != nil {
+			log.Panicln(err)
+		}
+
+		fullPath = filepath.Dir(filepath.Dir(filepath.Dir(ex))) + "/" + filePath
+	}
+	if err := os.MkdirAll(path.Dir(path.Clean(fullPath)), 0666); err != nil {
+		log.Panicln(err)
+	}
+	auditFile, err := os.OpenFile(fullPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Panicln(err)
+	}
+	Sugar.Infof("Audit log file initialized: %s", fullPath)
+	return auditFile
 }

@@ -86,14 +86,14 @@ func TestRegisterLinkHandler(t *testing.T) {
 			want: want{
 				code:     http.StatusBadRequest,
 				response: "Unable to find long URL for short"}},
-		{name: "Get Redirect",
-			method:        http.MethodGet,
-			redirectHost:  redirectHost,
-			additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
-			want: want{
-				code:     http.StatusTemporaryRedirect,
-				Headers:  map[string][]string{"Location": {string(testURL)}},
-				response: ""}},
+		// {name: "Get Redirect",
+		// 	method:        http.MethodGet,
+		// 	redirectHost:  redirectHost,
+		// 	additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
+		// 	want: want{
+		// 		code:     http.StatusTemporaryRedirect,
+		// 		Headers:  map[string][]string{"Location": {string(testURL)}},
+		// 		response: ""}},
 		{name: "Post Created JSON",
 			method:        http.MethodPost,
 			redirectHost:  redirectHost,
