@@ -60,6 +60,7 @@ func Initialize(level string) error {
 	return nil
 }
 
+// GetConfig return zapcore.EncoderConfig.
 func GetConfig() zapcore.EncoderConfig {
 	return config.EncoderConfig
 }
@@ -75,9 +76,11 @@ func RequestLogger(h http.HandlerFunc) http.Handler {
 	})
 }
 
+// AuditLogger provide audit logger.
 func AuditLogger(auditConf *audit.Audit) *zap.Logger {
 	once.Do(func() {
 		cores := make([]zapcore.Core, 0, 2)
+
 		emptyCfg := zapcore.EncoderConfig{
 			TimeKey:       "",
 			LevelKey:      "",
@@ -93,44 +96,61 @@ func AuditLogger(auditConf *audit.Audit) *zap.Logger {
 				Log.Level(),                           // Use the same level as the original core
 			))
 		}
-		if auditConf.GetLogUrlPath() != "" {
+
+		if auditConf.GetLogURLPath() != "" {
 			cores = append(cores, zapcore.NewCore(
 				zapcore.NewJSONEncoder(emptyCfg),           // Custom encoder
 				zapcore.AddSync(NewAuditClient(auditConf)), // Sync to stdout
 				Log.Level(), // Use the same level as the original core
 			))
 		}
+
 		core := zapcore.NewTee(cores...)
 		auditLogger = zap.New(core)
 	})
+
 	return auditLogger
 }
 
+// AuditClient provide audit client for zapcore.
 type AuditClient struct {
 	client    *resty.Client
 	auditConf *audit.Audit
 }
 
+// NewAuditClient create AuditClient.
 func NewAuditClient(auditConf *audit.Audit) *AuditClient {
 	ac := &AuditClient{
 		client:    auditConf.GetURLWriter(),
 		auditConf: auditConf,
 	}
+
 	return ac
 }
 
+// Write implement zapcore.WriteSyncer interface.
 func (ac *AuditClient) Write(massage []byte) (int, error) {
 	buf := bytes.NewBuffer([]byte{})
-	buf.Write([]byte(massage))
-	_, err := ac.client.GetClient().Post(ac.auditConf.GetLogUrlPath(), "application-json", buf)
+	buf.Write(massage)
+
+	resp, err := ac.client.GetClient().Post(ac.auditConf.GetLogURLPath(), "application-json", buf)
+	if err != nil {
+		Sugar.Errorf("Error sending audit by URL: <%s>: %v", ac.auditConf.GetLogURLPath(), err)
+	}
+
+	err = resp.Body.Close()
+	if err != nil {
+		Sugar.Errorf("Error closing response body: %v", err)
+	}
 
 	return len(massage), err
 }
 
 func getLogFile(filePath string) *os.File {
-	var err error
-	var fullPath string = filePath
-	// инициализируем объект
+	var (
+		err      error
+		fullPath = filePath
+	)
 
 	if !strings.HasPrefix(filePath, "/") {
 		ex, err := os.Executable()
@@ -147,6 +167,8 @@ func getLogFile(filePath string) *os.File {
 	if err != nil {
 		log.Panicln(err)
 	}
+
 	Sugar.Infof("Audit log file initialized: %s", fullPath)
+
 	return auditFile
 }

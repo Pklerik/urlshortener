@@ -220,6 +220,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil && !errors.Is(err, io.EOF) {
 		logger.Log.Debug("cannot read body", zap.Error(err))
@@ -350,13 +351,15 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
 }
 
+// AuditMiddleware provide audit logging for requests.
 func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		var (
-			action string = "follow"
+			action = "follow"
 			req    model.Request
 		)
-		if lh.Args.GetAudit() == nil || (lh.Args.GetAudit().GetLogFilePath() == "" && lh.Args.GetAudit().LogUrlPath == "") {
+
+		if lh.Args.GetAudit() == nil || (lh.Args.GetAudit().GetLogFilePath() == "" && lh.Args.GetAudit().LogURLPath == "") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -374,7 +377,9 @@ func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
 		}
 
 		var buf bytes.Buffer
+
 		tee := io.TeeReader(r.Body, &buf)
+
 		body, err := io.ReadAll(tee)
 		if err != nil && !errors.Is(err, io.EOF) {
 			logger.Log.Debug("cannot read body", zap.Error(err))
@@ -384,6 +389,7 @@ func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
 			logger.Log.Debug("cannot read request", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 		}
+
 		if req.URL == "" {
 			logger.Log.Error("request is empty")
 		}
@@ -393,13 +399,15 @@ func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+
 		extendedLogger.Log(logger.Log.Level(), "", zap.Int64("ts", time.Now().Unix()),
 			zap.String("action", action),
 			zap.String("user_id", string(userID)),
-			zap.String("url", string(req.URL)),
+			zap.String("url", req.URL),
 		)
 
 		next.ServeHTTP(w, r)
 	}
+
 	return http.HandlerFunc(fn)
 }

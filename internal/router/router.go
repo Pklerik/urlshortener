@@ -4,6 +4,7 @@ package router
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/Pklerik/urlshortener/internal/config"
@@ -21,28 +22,16 @@ import (
 
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) (http.Handler, error) {
-	var linksRepo repository.LinksRepository
+	var (
+		linksRepo repository.LinksRepository
+		err       error
+	)
 
 	r := chi.NewRouter()
 
-	dbConf, err := parsedFlags.GetDatabaseConf()
-	switch {
-	case err == nil:
-		logger.Sugar.Info("Used DB realization")
-
-		linksRepo, err = dbrepo.NewDBLinksRepository(ctx, dbConf)
-		if err != nil {
-			logger.Sugar.Error(err)
-			return r, fmt.Errorf("ConfigureRouter: %w", err)
-		}
-	case parsedFlags.GetLocalStorage() != "":
-		logger.Sugar.Info("Used File realization")
-
-		linksRepo = localfile.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage())
-	default:
-		logger.Sugar.Info("Used InMemory realization")
-
-		linksRepo = inmemory.NewInMemoryLinksRepository()
+	linksRepo, err = chooseRepoRealization(ctx, parsedFlags)
+	if err != nil {
+		return r, fmt.Errorf("ConfigureRouter: %w", err)
 	}
 
 	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
@@ -81,10 +70,37 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	})
 
 	// Use chi.Walk to print all routes
-	chi.Walk(r, func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
-		fmt.Printf("[%s] %s\n", method, route)
+	err = chi.Walk(r, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		log.Printf("[%s] %s\n", method, route)
 		return nil
 	})
+	if err != nil {
+		logger.Sugar.Error(err)
+	}
 
 	return r, nil
+}
+
+func chooseRepoRealization(ctx context.Context, parsedFlags config.StartupFlagsParser) (repository.LinksRepository, error) {
+	dbConf, err := parsedFlags.GetDatabaseConf()
+	switch {
+	case err == nil:
+		logger.Sugar.Info("Used DB realization")
+
+		repo, err := dbrepo.NewDBLinksRepository(ctx, dbConf)
+		if err != nil {
+			logger.Sugar.Error(err)
+			return repo, fmt.Errorf("ConfigureRouter: %w", err)
+		}
+
+		return repo, nil
+	case parsedFlags.GetLocalStorage() != "":
+		logger.Sugar.Info("Used File realization")
+
+		return localfile.NewLocalMemoryLinksRepository(parsedFlags.GetLocalStorage()), nil
+	default:
+		logger.Sugar.Info("Used InMemory realization")
+
+		return inmemory.NewInMemoryLinksRepository(), nil
+	}
 }

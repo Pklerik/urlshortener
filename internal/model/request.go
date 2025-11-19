@@ -11,6 +11,7 @@ type Requester interface {
 	String() string
 }
 
+// RequestTextPlainHandler provide interface for handling text/plain requests.
 type RequestTextPlainHandler interface {
 	Requester
 	SetBody(body string)
@@ -27,8 +28,8 @@ func (req *Request) String() string {
 }
 
 // SetBody set body to Request.
-func (r *Request) SetBody(body string) {
-	r.URL = body
+func (req *Request) SetBody(body string) {
+	req.URL = body
 }
 
 // ReqPostBatch provide batch contract.

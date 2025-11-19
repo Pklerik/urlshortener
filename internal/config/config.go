@@ -78,6 +78,7 @@ func (sf *StartupFlags) GetDatabaseConf() (dbconf.DBConfigurer, error) {
 	return sf.DBConf, nil
 }
 
+// GetAudit returns Audit config.
 func (sf *StartupFlags) GetAudit() *audit.Audit {
 	return sf.Audit
 }

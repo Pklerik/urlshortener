@@ -33,8 +33,8 @@ func readReq(r *http.Request, body []byte, req model.Requester) error {
 
 		return nil
 	}
-	return nil
 
+	return nil
 }
 
 func writeRes(w http.ResponseWriter, res model.Responser) error {

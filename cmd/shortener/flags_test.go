@@ -35,7 +35,7 @@ func Test_parseFlags(t *testing.T) {
 				},
 				Audit: &audit.Audit{
 					LogFilePath: "",
-					LogUrlPath:  "",
+					LogURLPath:  "",
 				},
 			}},
 	}
@@ -44,7 +44,7 @@ func Test_parseFlags(t *testing.T) {
 			for key, value := range tt.envVars {
 				os.Setenv(key, value)
 			}
-			if got := parseFlags(); !reflect.DeepEqual(got, tt.want) {
+			if got := parseArgs(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseFlags() = %v, want %v", got, tt.want)
 			}
 			for key := range tt.envVars {
