@@ -55,21 +55,21 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		// middleware.Recoverer,
 		middleware.GZIPMiddleware,
 		linksHandler.AuthUser,
+		chimiddleware.Timeout(parsedFlags.GetTimeout()),
 	)
 
-	r.Use(chimiddleware.Timeout(parsedFlags.GetTimeout()))
-
-	r.Group(func(r chi.Router) {
-		r.Use(linksHandler.AuditMiddleware)
-
-		r.Post("/", linksHandler.PostText)
-		r.Get("/{shortURL}", linksHandler.Get)
-		r.Post("/api/shorten", linksHandler.PostJSON)
-	})
-
 	r.Route("/", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(linksHandler.AuditMiddleware)
+			r.Post("/", linksHandler.PostText)
+			r.Get("/{shortURL}", linksHandler.Get)
+		})
 		r.Route("/api", func(r chi.Router) {
 			r.Route("/shorten", func(r chi.Router) {
+				r.Group(func(r chi.Router) {
+					r.Use(linksHandler.AuditMiddleware)
+					r.Post("/", linksHandler.PostJSON)
+				})
 				r.Post("/batch", linksHandler.PostBatchJSON)
 			})
 			r.Route("/user", func(r chi.Router) {
