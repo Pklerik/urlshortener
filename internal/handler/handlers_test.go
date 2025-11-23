@@ -254,3 +254,25 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 		})
 	}
 }
+
+// ExampleGet demonstrates how to use Get method of LinkHandler.
+func ExampleGet() {
+	ctrl := gomock.NewController(nil)
+	r := mock_repository.NewMockLinksRepository(ctrl)
+
+	defer ctrl.Finish()
+	r.EXPECT().FindShort(gomock.Any(), "398f0ca4").Return(model.LinkData{UUID: "123", ShortURL: "398f0ca4", LongURL: "http://ya.ru"}, nil).AnyTimes()
+
+	ls := links.NewLinksService(r, baseConfig.GetSecretKey())
+	lh := NewLinkHandler(
+		links.NewLinksService(r, baseConfig.GetSecretKey()),
+		NewAuthenticationHandler(ls),
+		baseConfig,
+	)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("shortURL", "398f0ca4")
+	req := httptest.NewRequest("GET", "/398f0ca4", nil)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	lh.Get(httptest.NewRecorder(), req)
+	// Output:
+}
