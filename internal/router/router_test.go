@@ -9,15 +9,12 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/go-resty/resty/v2"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -212,39 +209,39 @@ func BenchmarkShortenerService(b *testing.B) {
 	client.SetRedirectPolicy(resty.NoRedirectPolicy())
 
 	b.ResetTimer()
-	b.Run("Shorten URLs repo", func(b *testing.B) {
-		dbc := &dbconf.Conf{}
-		err := godotenv.Load("/Users/pavelbudkov/dev/urlshortener/.env")
-		if err != nil {
-			log.Fatal("Error loading .env file")
-		}
-		dbc.Set(os.Getenv("DATABASE_DSN"))
-		log.Println(dbc.String())
-		r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
-			ServerAddress: &config.Address{
-				Protocol: "http",
-				Host:     "localhost",
-				Port:     16080},
-			BaseURL: "http://test_host:2345",
-			DBConf:  dbc,
-			Timeout: 10000,
-		})
-		assert.NoError(b, err, "error setup router")
-		srv := httptest.NewServer(r)
-		defer srv.Close()
+	// b.Run("Shorten URLs repo", func(b *testing.B) {
+	// 	dbc := &dbconf.Conf{}
+	// 	err := godotenv.Load("/Users/pavelbudkov/dev/urlshortener/.env")
+	// 	if err != nil {
+	// 		log.Fatal("Error loading .env file")
+	// 	}
+	// 	dbc.Set(os.Getenv("DATABASE_DSN"))
+	// 	log.Println(dbc.String())
+	// 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
+	// 		ServerAddress: &config.Address{
+	// 			Protocol: "http",
+	// 			Host:     "localhost",
+	// 			Port:     16080},
+	// 		BaseURL: "http://test_host:2345",
+	// 		DBConf:  dbc,
+	// 		Timeout: 10000,
+	// 	})
+	// 	assert.NoError(b, err, "error setup router")
+	// 	srv := httptest.NewServer(r)
+	// 	defer srv.Close()
 
-		for i := 0; i < b.N; i++ {
-			req := client.R()
-			req.Method = http.MethodPost
-			req.URL = srv.URL
-			req.Body = []byte(test_urls[i%maxSize])
-			_, err := req.Send()
-			if err != nil {
-				b.Errorf("error making HTTP request: %v", err)
-			}
+	// 	for i := 0; i < b.N; i++ {
+	// 		req := client.R()
+	// 		req.Method = http.MethodPost
+	// 		req.URL = srv.URL
+	// 		req.Body = []byte(test_urls[i%maxSize])
+	// 		_, err := req.Send()
+	// 		if err != nil {
+	// 			b.Errorf("error making HTTP request: %v", err)
+	// 		}
 
-		}
-	})
+	// 	}
+	// })
 
 	// b.Run("Shorten URLs local", func(b *testing.B) {
 	// 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
@@ -271,30 +268,30 @@ func BenchmarkShortenerService(b *testing.B) {
 	// 	}
 	// })
 
-	// b.Run("Shorten URLs inmem", func(b *testing.B) {
+	b.Run("Shorten URLs inmem", func(b *testing.B) {
 
-	// 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
-	// 		ServerAddress: &config.Address{
-	// 			Protocol: "http",
-	// 			Host:     "localhost",
-	// 			Port:     16082},
-	// 		BaseURL: "http://test_host:2345",
-	// 		Timeout: 10000,
-	// 	})
-	// 	assert.NoError(b, err, "error setup router")
-	// 	srv := httptest.NewServer(r)
-	// 	defer srv.Close()
+		r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
+			ServerAddress: &config.Address{
+				Protocol: "http",
+				Host:     "localhost",
+				Port:     16082},
+			BaseURL: "http://test_host:2345",
+			Timeout: 10000,
+		})
+		assert.NoError(b, err, "error setup router")
+		srv := httptest.NewServer(r)
+		defer srv.Close()
 
-	// 	for i := 0; i < b.N; i++ {
-	// 		req := client.R()
-	// 		req.Method = http.MethodPost
-	// 		req.URL = srv.URL
-	// 		req.Body = []byte(test_urls[i%maxSize])
-	// 		_, err := req.Send()
-	// 		if err != nil {
-	// 			b.Errorf("error making HTTP request: %v", err)
-	// 		}
-	// 	}
-	// })
+		for i := 0; i < b.N; i++ {
+			req := client.R()
+			req.Method = http.MethodPost
+			req.URL = srv.URL
+			req.Body = []byte(test_urls[i%maxSize])
+			_, err := req.Send()
+			if err != nil {
+				b.Errorf("error making HTTP request: %v", err)
+			}
+		}
+	})
 
 }

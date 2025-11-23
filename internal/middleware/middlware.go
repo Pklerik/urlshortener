@@ -10,12 +10,6 @@ import (
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
-	"github.com/Pklerik/urlshortener/pkg/random"
-)
-
-var (
-	// SecretKey is generated secret key, which will be recreates each time service is starting.
-	SecretKey, _ = random.RandBytes(32)
 )
 
 type (
