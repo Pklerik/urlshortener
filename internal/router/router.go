@@ -36,7 +36,10 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	}
 
 	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
-	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
+
+	authHandler := handler.NewAuthenticationHandler(linksService)
+	linksHandler := handler.NewLinkHandler(linksService, authHandler, parsedFlags)
+	auditHandler := handler.NewAuditor(parsedFlags, authHandler)
 
 	// Add pprof routes
 	r.Mount("/debug", chimiddleware.Profiler())
@@ -48,19 +51,19 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 			chimiddleware.Logger,
 			chimiddleware.Recoverer,
 			middleware.GZIPMiddleware,
-			linksHandler.AuthUser,
+			authHandler.AuthUser,
 			chimiddleware.Timeout(parsedFlags.GetTimeout()),
 		)
 		r.Route("/", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(linksHandler.AuditMiddleware)
+				r.Use(auditHandler.AuditMiddleware)
 				r.Post("/", linksHandler.PostText)
 				r.Get("/{shortURL}", linksHandler.Get)
 			})
 			r.Route("/api", func(r chi.Router) {
 				r.Route("/shorten", func(r chi.Router) {
 					r.Group(func(r chi.Router) {
-						r.Use(linksHandler.AuditMiddleware)
+						r.Use(auditHandler.AuditMiddleware)
 						r.Post("/", linksHandler.PostJSON)
 					})
 					r.Post("/batch", linksHandler.PostBatchJSON)

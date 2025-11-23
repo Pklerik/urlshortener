@@ -2,14 +2,11 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler/validators"
@@ -22,11 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	// ErrUnauthorizedUser - unauthorized user.
-	ErrUnauthorizedUser = errors.New("unauthorized user")
-)
-
 // LinkHandler - provide contract for request handling.
 type LinkHandler interface {
 	Get(w http.ResponseWriter, r *http.Request)
@@ -36,20 +28,18 @@ type LinkHandler interface {
 	PostBatchJSON(w http.ResponseWriter, r *http.Request)
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
 	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
-	AuthUser(next http.Handler) http.Handler
-	AuditMiddleware(next http.Handler) http.Handler
-	GetUserIDFromCookie(r *http.Request) (model.UserID, error)
 }
 
 // LinkHandle - wrapper for service handling.
 type LinkHandle struct {
 	service service.LinkServicer
+	ah      IAuthentication
 	Args    config.StartupFlagsParser
 }
 
 // NewLinkHandler returns instance of LinkHandler.
-func NewLinkHandler(userService service.LinkServicer, args config.StartupFlagsParser) LinkHandler {
-	return &LinkHandle{service: userService, Args: args}
+func NewLinkHandler(userService service.LinkServicer, ah IAuthentication, args config.StartupFlagsParser) LinkHandler {
+	return &LinkHandle{service: userService, ah: ah, Args: args}
 }
 
 // Get returns Handler for URLs registration for GET method.
@@ -93,7 +83,7 @@ func (lh *LinkHandle) PostText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := lh.GetUserIDFromCookie(r)
+	userID, err := lh.ah.GetUserIDFromCookie(r)
 	if err != nil && !errors.Is(err, ErrUnauthorizedUser) {
 		logger.Sugar.Errorf(`authorize service error: %d`, http.StatusInternalServerError)
 		http.Error(w, `Unauthorized`, http.StatusInternalServerError)
@@ -154,7 +144,7 @@ func (lh *LinkHandle) PostJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(r)
+	userID, err := lh.ah.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -239,7 +229,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 		reqLongUrls = append(reqLongUrls, reqElem.LongURL)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(r)
+	userID, err := lh.ah.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -273,7 +263,7 @@ func (lh *LinkHandle) PostBatchJSON(w http.ResponseWriter, r *http.Request) {
 
 // GetUserLinks for handle get request for user data.
 func (lh *LinkHandle) GetUserLinks(w http.ResponseWriter, r *http.Request) {
-	userID, err := lh.GetUserIDFromCookie(r)
+	userID, err := lh.ah.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -332,7 +322,7 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	userID, err := lh.GetUserIDFromCookie(r)
+	userID, err := lh.ah.GetUserIDFromCookie(r)
 	if err != nil {
 		return
 	}
@@ -349,65 +339,4 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
-}
-
-// AuditMiddleware provide audit logging for requests.
-func (lh *LinkHandle) AuditMiddleware(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		var (
-			action = "follow"
-			req    model.Request
-		)
-
-		if lh.Args.GetAudit() == nil || (lh.Args.GetAudit().GetLogFilePath() == "" && lh.Args.GetAudit().LogURLPath == "") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/"):
-			action = "shorten"
-		case strings.HasSuffix(r.URL.Path, "/api/shorten"):
-			action = "shorten"
-		}
-
-		userID, err := lh.GetUserIDFromCookie(r)
-		if err != nil {
-			userID = model.UserID("unauthorized")
-		}
-
-		var buf bytes.Buffer
-
-		tee := io.TeeReader(r.Body, &buf)
-
-		body, err := io.ReadAll(tee)
-		if err != nil && !errors.Is(err, io.EOF) {
-			logger.Log.Debug("cannot read body", zap.Error(err))
-		}
-
-		if err := readReq(r, body, &req); err != nil {
-			logger.Log.Debug("cannot read request", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
-		if req.URL == "" {
-			logger.Log.Error("request is empty")
-		}
-
-		extendedLogger := logger.AuditLogger(lh.Args.GetAudit())
-		if extendedLogger == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		extendedLogger.Log(logger.Log.Level(), "", zap.Int64("ts", time.Now().Unix()),
-			zap.String("action", action),
-			zap.String("user_id", string(userID)),
-			zap.String("url", req.URL),
-		)
-
-		next.ServeHTTP(w, r)
-	}
-
-	return http.HandlerFunc(fn)
 }
