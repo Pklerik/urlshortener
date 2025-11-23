@@ -366,10 +366,9 @@ func proceedBatch(ctx context.Context, db *sql.DB, ids []model.UUIDv7) (int, err
 		args[i] = string(id)
 	}
 
-	query := fmt.Sprintf(`UPDATE links 
-		SET is_deleted = true 
-		WHERE id IN (%s)
-		RETURNING id;`, strings.Join(placeholders, ", "))
+	query := "UPDATE links SET is_deleted = true WHERE id IN (" +
+		strings.Join(placeholders, ", ") +
+		") RETURNING id;"
 
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {

@@ -19,8 +19,6 @@ import (
 	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
 	chimiddleware "github.com/go-chi/chi/middleware"
-
-	_ "net/http/pprof"
 )
 
 // ConfigureRouter starts server with base configuration.
@@ -48,13 +46,12 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 			chimiddleware.RequestID,
 			chimiddleware.RealIP,
 			chimiddleware.Logger,
-			// middleware.Recoverer,
+			chimiddleware.Recoverer,
 			middleware.GZIPMiddleware,
 			linksHandler.AuthUser,
 			chimiddleware.Timeout(parsedFlags.GetTimeout()),
 		)
 		r.Route("/", func(r chi.Router) {
-
 			r.Group(func(r chi.Router) {
 				r.Use(linksHandler.AuditMiddleware)
 				r.Post("/", linksHandler.PostText)
@@ -77,20 +74,26 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		})
 	})
 
-	// Use chi.Walk to print all routes
-	err = chi.Walk(r, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+	printRoutes(r)
+
+	return r, nil
+}
+
+// Use chi.Walk to print all routes.
+func printRoutes(r *chi.Mux) {
+	err := chi.Walk(r, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		// Skip debug routes
 		if strings.HasPrefix(route, "/debug") {
 			return nil
 		}
+
 		log.Printf("[%s] %s\n", method, route)
+
 		return nil
 	})
 	if err != nil {
 		logger.Sugar.Error(err)
 	}
-
-	return r, nil
 }
 
 func chooseRepoRealization(ctx context.Context, parsedFlags config.StartupFlagsParser) (repository.LinksRepository, error) {

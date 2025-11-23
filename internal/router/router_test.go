@@ -201,9 +201,9 @@ func BenchmarkShortenerService(b *testing.B) {
 	logger.Initialize("ERROR")
 	maxSize := 50
 
-	test_urls := make([]string, maxSize)
+	testUrls := make([]string, maxSize)
 	for i := 0; i < b.N; i++ {
-		test_urls[i] = "http://benchmark/" + RandStringBytes(30)
+		testUrls[i] = "http://benchmark/" + RandStringBytes(30)
 	}
 	client := resty.New()
 	client.SetRedirectPolicy(resty.NoRedirectPolicy())
@@ -234,7 +234,7 @@ func BenchmarkShortenerService(b *testing.B) {
 	// 		req := client.R()
 	// 		req.Method = http.MethodPost
 	// 		req.URL = srv.URL
-	// 		req.Body = []byte(test_urls[i%maxSize])
+	// 		req.Body = []byte(testUrls[i%maxSize])
 	// 		_, err := req.Send()
 	// 		if err != nil {
 	// 			b.Errorf("error making HTTP request: %v", err)
@@ -260,7 +260,7 @@ func BenchmarkShortenerService(b *testing.B) {
 	// 		req := client.R()
 	// 		req.Method = http.MethodPost
 	// 		req.URL = srv.URL
-	// 		req.Body = []byte(test_urls[i%maxSize])
+	// 		req.Body = []byte(testUrls[i%maxSize])
 	// 		_, err := req.Send()
 	// 		if err != nil {
 	// 			b.Errorf("error making HTTP request: %v", err)
@@ -286,7 +286,7 @@ func BenchmarkShortenerService(b *testing.B) {
 			req := client.R()
 			req.Method = http.MethodPost
 			req.URL = srv.URL
-			req.Body = []byte(test_urls[i%maxSize])
+			req.Body = []byte(testUrls[i%maxSize])
 			_, err := req.Send()
 			if err != nil {
 				b.Errorf("error making HTTP request: %v", err)
