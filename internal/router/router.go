@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/handler"
@@ -18,6 +19,8 @@ import (
 	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
 	chimiddleware "github.com/go-chi/chi/middleware"
+
+	_ "net/http/pprof"
 )
 
 // ConfigureRouter starts server with base configuration.
@@ -37,40 +40,49 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
 	linksHandler := handler.NewLinkHandler(linksService, parsedFlags)
 
-	r.Use(
-		chimiddleware.RequestID,
-		chimiddleware.RealIP,
-		chimiddleware.Logger,
-		// middleware.Recoverer,
-		middleware.GZIPMiddleware,
-		linksHandler.AuthUser,
-		chimiddleware.Timeout(parsedFlags.GetTimeout()),
-	)
+	// Add pprof routes
+	r.Mount("/debug", chimiddleware.Profiler())
 
-	r.Route("/", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-			r.Use(linksHandler.AuditMiddleware)
-			r.Post("/", linksHandler.PostText)
-			r.Get("/{shortURL}", linksHandler.Get)
-		})
-		r.Route("/api", func(r chi.Router) {
-			r.Route("/shorten", func(r chi.Router) {
-				r.Group(func(r chi.Router) {
-					r.Use(linksHandler.AuditMiddleware)
-					r.Post("/", linksHandler.PostJSON)
+	r.Group(func(r chi.Router) {
+		r.Use(
+			chimiddleware.RequestID,
+			chimiddleware.RealIP,
+			chimiddleware.Logger,
+			// middleware.Recoverer,
+			middleware.GZIPMiddleware,
+			linksHandler.AuthUser,
+			chimiddleware.Timeout(parsedFlags.GetTimeout()),
+		)
+		r.Route("/", func(r chi.Router) {
+
+			r.Group(func(r chi.Router) {
+				r.Use(linksHandler.AuditMiddleware)
+				r.Post("/", linksHandler.PostText)
+				r.Get("/{shortURL}", linksHandler.Get)
+			})
+			r.Route("/api", func(r chi.Router) {
+				r.Route("/shorten", func(r chi.Router) {
+					r.Group(func(r chi.Router) {
+						r.Use(linksHandler.AuditMiddleware)
+						r.Post("/", linksHandler.PostJSON)
+					})
+					r.Post("/batch", linksHandler.PostBatchJSON)
 				})
-				r.Post("/batch", linksHandler.PostBatchJSON)
+				r.Route("/user", func(r chi.Router) {
+					r.Get("/urls", linksHandler.GetUserLinks)
+					r.Delete("/urls", linksHandler.DeleteUserLinks)
+				})
 			})
-			r.Route("/user", func(r chi.Router) {
-				r.Get("/urls", linksHandler.GetUserLinks)
-				r.Delete("/urls", linksHandler.DeleteUserLinks)
-			})
+			r.Get("/ping", linksHandler.PingDB)
 		})
-		r.Get("/ping", linksHandler.PingDB)
 	})
 
 	// Use chi.Walk to print all routes
 	err = chi.Walk(r, func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+		// Skip debug routes
+		if strings.HasPrefix(route, "/debug") {
+			return nil
+		}
 		log.Printf("[%s] %s\n", method, route)
 		return nil
 	})

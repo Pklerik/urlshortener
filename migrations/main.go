@@ -24,7 +24,7 @@ func MakeMigrations(ctx context.Context, db *sql.DB, dbConf dbconf.DBConfigurer)
 
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("crating tx error: %w", err)
+		return fmt.Errorf("creating tx error: %w", err)
 	}
 
 	scheme := fmt.Sprintf(`"%s"`, dbConf.GetOptions()["search_path"])

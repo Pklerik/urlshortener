@@ -45,3 +45,15 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkBaseLinkService_RegisterLinks(b *testing.B) {
+	logger.Initialize("ERROR")
+	ls := NewLinksService(inmemory.NewInMemoryLinksRepository(), "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs=")
+	ctx := context.Background()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if _, err := ls.RegisterLinks(ctx, []string{"http://example.org"}, "0199996a-fd98-780c-b5aa-1aef966fb36e0"); err != nil {
+			b.Fatalf("RegisterLinks error: %v", err)
+		}
+	}
+}
