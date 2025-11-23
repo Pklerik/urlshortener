@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/Pklerik/urlshortener/internal/dictionary"
-	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 )
@@ -38,7 +37,6 @@ func (r *LinksRepositoryMemory) SetLinks(_ context.Context, links []model.LinkDa
 		}
 
 		r.Shorts[linkData.ShortURL] = &linkData
-		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 	}
 
 	return links, nil

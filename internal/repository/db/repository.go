@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
@@ -128,18 +129,25 @@ func (r *LinksRepositoryPostgres) insertBatch(ctx context.Context, links []model
 	return linksData, nil
 }
 
-func prepareInsertionQuery(links []model.LinkData) (string, []interface{}) {
-	var (
-		queryArgs    = make([]interface{}, 0, 4*len(links))
-		placeholders = make([]string, 0, 4*len(links))
-	)
-	for pgi, linkData := range links {
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d)", pgi*4+1, pgi*4+2, pgi*4+3, pgi*4+4))
-		queryArgs = append(queryArgs, linkData.UUID, linkData.ShortURL, linkData.LongURL, linkData.UserID)
-		logger.Sugar.Infof("Short url: %s sets for long: %s by userID: %d", linkData.ShortURL, linkData.LongURL, linkData.UserID)
+func prepareInsertionQuery(links []model.LinkData) (string, []any) {
+	if len(links) == 0 {
+		return "", nil
 	}
 
-	return fmt.Sprintf("INSERT INTO links (id, short_url, long_url, user_id) VALUES %s ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id", strings.Join(placeholders, ", ")), queryArgs
+	queryArgs := make([]any, 0, 4*len(links))
+	placeholders := make([]string, 0, len(links))
+
+	for i, link := range links {
+		base := i*4 + 1
+		placeholders = append(placeholders, "($"+strconv.Itoa(base)+", $"+strconv.Itoa(base+1)+", $"+strconv.Itoa(base+2)+", $"+strconv.Itoa(base+3)+")")
+		queryArgs = append(queryArgs, link.UUID, link.ShortURL, link.LongURL, link.UserID)
+	}
+
+	query := "INSERT INTO links (id, short_url, long_url, user_id) VALUES " +
+		strings.Join(placeholders, ", ") +
+		" ON CONFLICT (short_url) DO NOTHING RETURNING id, short_url, long_url, user_id"
+
+	return query, queryArgs
 }
 
 // collectLinks(rows *sql.Rows, data *any, items ...any) (int, error)
