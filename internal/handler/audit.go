@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -14,8 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// IAuditor provide audit logging for requests.
-type IAuditor interface {
+// Auditer provide audit logging for requests.
+type Auditer interface {
 	AuditMiddleware(next http.Handler) http.Handler
 }
 
@@ -36,42 +37,25 @@ func NewAuditor(args config.StartupFlagsParser, ah IAuthentication) *Auditor {
 // AuditMiddleware provide audit logging for requests.
 func (a *Auditor) AuditMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
-		var (
-			action = "follow"
-			req    model.Request
-		)
-
 		if a.Args.GetAudit() == nil || (a.Args.GetAudit().GetLogFilePath() == "" && a.Args.GetAudit().LogURLPath == "") {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		switch {
-		case strings.HasSuffix(r.URL.Path, "/"):
-			action = "shorten"
-		case strings.HasSuffix(r.URL.Path, "/api/shorten"):
-			action = "shorten"
-		}
-
+		action := getAction(r.URL.Path)
 		userID, err := a.ah.GetUserIDFromCookie(r)
 		if err != nil {
 			userID = model.UserID("unauthorized")
 		}
 
-		var buf bytes.Buffer
+		req := model.Request{}
 
-		tee := io.TeeReader(r.Body, &buf)
-
-		body, err := io.ReadAll(tee)
-		if err != nil && !errors.Is(err, io.EOF) {
-			logger.Log.Debug("cannot read body", zap.Error(err))
+		err = reedBodyWithTeeReader(r, &req)
+		if err != nil {
+			logger.Log.Error("cannot read body", zap.Error(err))
+			next.ServeHTTP(w, r)
+			return
 		}
-
-		if err := readReq(r, body, &req); err != nil {
-			logger.Log.Debug("cannot read request", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
 		if req.URL == "" {
 			logger.Log.Error("request is empty")
 		}
@@ -92,4 +76,33 @@ func (a *Auditor) AuditMiddleware(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(fn)
+}
+
+func getAction(urlPath string) string {
+	if strings.HasSuffix(urlPath, "/") {
+		return "shorten"
+	}
+	if strings.HasSuffix(urlPath, "/api/shorten") {
+		return "shorten"
+	}
+	return "follow"
+}
+
+func reedBodyWithTeeReader(r *http.Request, req *model.Request) error {
+	var buf bytes.Buffer
+
+	tee := io.TeeReader(r.Body, &buf)
+
+	body, err := io.ReadAll(tee)
+	if err != nil && !errors.Is(err, io.EOF) {
+		logger.Log.Debug("cannot read body", zap.Error(err))
+		return fmt.Errorf("reedBodyWithTeeReader: %w", err)
+	}
+
+	if err := readReq(r, body, req); err != nil {
+		logger.Log.Error("cannot read request", zap.Error(err))
+		return fmt.Errorf("reedBodyWithTeeReader: %w", err)
+	}
+
+	return nil
 }

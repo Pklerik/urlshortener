@@ -73,10 +73,5 @@ func parseEnvs() *config.StartupFlags {
 		log.Fatal(err)
 	}
 
-	err = env.Parse(envArgs.Audit)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	return envArgs
 }
