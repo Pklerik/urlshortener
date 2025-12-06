@@ -49,7 +49,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				}
 
 				if ident.Name == "os" && sel.Sel.Name == "Exit" {
-					pass.Reportf(sel.Sel.Pos(), "direct call of os.Exit is not allowed for package main's main() function")
+					pass.Reportf(sel.Sel.Pos(), "direct call of Exit")
 				}
 
 				return true

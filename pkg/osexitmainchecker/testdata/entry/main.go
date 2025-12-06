@@ -8,5 +8,5 @@ import (
 func main() {
 	a := 2 + 3
 	fmt.Println(a)
-	os.Exit(0) // want "direct call of os.Exit is not allowed for package main's main() function"
+	os.Exit(0) // want "direct call of Exit"
 }
