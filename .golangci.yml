@@ -71,6 +71,9 @@ linters:
       allow-first-in-block: true
       allow-whole-block: false
       branch-max-lines: 2 
+    govet:
+      enable:
+      - fieldalignment
 run:
   # Timeout for total work, e.g. 30s, 5m, 5m30s.
   # If the value is lower or equal to 0, the timeout is disabled.

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+// ErrOsExitMainCheckAnalyzer check call os.Exit in func main() of package main.
 var ErrOsExitMainCheckAnalyzer = &analysis.Analyzer{
 	Name: "osexitmainchecker",
 	Doc:  "check call os.Exit in func main() of package main",
@@ -36,17 +37,21 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				if !ok {
 					return true
 				}
+
 				sel, ok := call.Fun.(*ast.SelectorExpr)
 				if !ok {
 					return true
 				}
+
 				ident, ok := sel.X.(*ast.Ident)
 				if !ok {
 					return true
 				}
+
 				if ident.Name == "os" && sel.Sel.Name == "Exit" {
 					pass.Reportf(sel.Sel.Pos(), "direct call of os.Exit is not allowed for package main's main() function")
 				}
+
 				return true
 			})
 		}

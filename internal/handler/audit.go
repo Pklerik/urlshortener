@@ -43,6 +43,7 @@ func (a *Auditor) AuditMiddleware(next http.Handler) http.Handler {
 		}
 
 		action := getAction(r.URL.Path)
+
 		userID, err := a.ah.GetUserIDFromCookie(r)
 		if err != nil {
 			userID = model.UserID("unauthorized")
@@ -54,8 +55,10 @@ func (a *Auditor) AuditMiddleware(next http.Handler) http.Handler {
 		if err != nil {
 			logger.Log.Error("cannot read body", zap.Error(err))
 			next.ServeHTTP(w, r)
+
 			return
 		}
+
 		if req.URL == "" {
 			logger.Log.Error("request is empty")
 		}
@@ -82,9 +85,11 @@ func getAction(urlPath string) string {
 	if strings.HasSuffix(urlPath, "/") {
 		return "shorten"
 	}
+
 	if strings.HasSuffix(urlPath, "/api/shorten") {
 		return "shorten"
 	}
+
 	return "follow"
 }
 

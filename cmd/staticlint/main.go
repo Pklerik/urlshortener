@@ -1,3 +1,4 @@
+// Package main entrypoint for linter app.
 package main
 
 import (
@@ -83,6 +84,7 @@ func main() {
 	for _, v := range simple.Analyzers {
 		analyzers = append(analyzers, v.Analyzer)
 	}
+
 	for _, v := range stylecheck.Analyzers {
 		analyzers = append(analyzers, v.Analyzer)
 	}

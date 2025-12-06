@@ -24,11 +24,13 @@ pprof-cpu:
 	go tool pprof -http :9000 profiles/cpu.out
 
 lint:
-	echo "Go vet"
+	echo "================Go vet=================="
 	go vet -vettool=$$(which statictest) ./...
-	echo "Go statickcheck"
+	echo "============Go statickcheck============="
 	staticcheck ./...
-	echo "Go Golint"
+	echo "============Go myStaticLint============="
+	go run ./cmd/staticlint $$(pwd)/cmd/shortener/...
+	echo "==============Go Golint================="
 	golangci-lint run ./...
 
 fdl:
