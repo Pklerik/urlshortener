@@ -24,10 +24,10 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 		longURLs []string
 	}
 	tests := []struct {
-		name    string
 		fields  fields
-		args    args
+		name    string
 		want    string
+		args    args
 		wantErr bool
 	}{
 		{name: "Base", fields: fields{linksRepo: inmemory.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},

@@ -4,7 +4,6 @@ package router
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -90,7 +89,7 @@ func printRoutes(r *chi.Mux) {
 			return nil
 		}
 
-		log.Printf("[%s] %s\n", method, route)
+		logger.Sugar.Infof("[%s] %s", method, route)
 
 		return nil
 	})

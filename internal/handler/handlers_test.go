@@ -39,16 +39,16 @@ func TestLinkHandle_Get(t *testing.T) {
 		Args config.StartupFlagsParser
 	}
 	type args struct {
+		body     io.Reader
 		method   string
 		target   string
 		shortURL string
-		body     io.Reader
 	}
 
 	tests := []struct {
-		name   string
-		fields fields
 		args   args
+		fields fields
+		name   string
 	}{
 		{name: "Get ya.ru",
 			fields: fields{
@@ -100,9 +100,9 @@ func TestLinkHandle_PostText(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
 		fields fields
 		args   args
+		name   string
 	}{
 		{name: "base POST TEXT",
 			fields: fields{
@@ -137,9 +137,9 @@ func TestLinkHandle_PostJson(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
 		fields fields
 		args   args
+		name   string
 	}{
 		{name: "base POST JSON",
 			fields: fields{
@@ -177,9 +177,9 @@ func TestLinkHandle_PingDB(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
 		fields fields
 		args   args
+		name   string
 	}{
 		{name: "base PING DB",
 			fields: fields{
@@ -217,9 +217,9 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 		r *http.Request
 	}
 	tests := []struct {
-		name   string
 		fields fields
 		args   args
+		name   string
 	}{
 		{name: "base POST JSON",
 			fields: fields{

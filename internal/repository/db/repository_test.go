@@ -21,10 +21,10 @@ func TestDBLinksRepository_getShort(t *testing.T) {
 		short string
 	}
 	tests := []struct {
-		name    string
 		fields  fields
-		args    args
 		want    *model.LinkData
+		args    args
+		name    string
 		wantErr bool
 	}{
 		// TODO: Add test cases.

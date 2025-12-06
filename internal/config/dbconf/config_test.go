@@ -22,10 +22,10 @@ func TestConf_Set(t *testing.T) {
 		s string
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
 		wantErr error
+		fields  fields
+		name    string
+		args    args
 	}{
 		{name: "empty conf", fields: fields{}, args: args{s: ""}, wantErr: ErrEmptyDatabaseConfig},
 		{name: "incorrect DB URL", fields: fields{}, args: args{s: "http"}, wantErr: ErrIncorrectDatabaseURL},
@@ -136,9 +136,9 @@ func Test_getOptions(t *testing.T) {
 		s string
 	}
 	tests := []struct {
+		want Options
 		name string
 		args args
-		want Options
 	}{
 		{name: "postgres", args: args{s: "postgresql://test_user:test_password@localhost:5432/test_db?search_path=test_schema"}, want: Options{"search_path": "test_schema"}},
 		{name: "mysql", args: args{s: "mysql://user:password@127.0.0.1:/_db?search_path=test_schema?option1=value2"}, want: Options{"search_path": "test_schema", "option1": "value2"}},

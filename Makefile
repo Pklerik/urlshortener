@@ -6,10 +6,9 @@ upd_test:
 	git fetch template && git checkout template/main .github
 
 test:
-	go test -coverpkg=./... -cover -coverprofile cover.tmp.out ./...
-	echo "-----------------------------------------------------------------------------------"
-	cat cover.tmp.out | grep -v "main.go" > cover.out
-	go tool cover -func cover.out
+	go test  -cover -coverprofile cover.tmp.out -coverpkg=./internal/... ./cmd/... ./api/... ./pkg/...
+	echo "-----------------------------------------------------------------------------------" 
+	go tool cover -func cover.temp.out
 	echo "-----------------------------------------------------------------------------------"
 	
 bench: 
@@ -25,7 +24,11 @@ pprof-cpu:
 	go tool pprof -http :9000 profiles/cpu.out
 
 lint:
+	echo "Go vet"
 	go vet -vettool=$$(which statictest) ./...
+	echo "Go statickcheck"
+	staticcheck ./...
+	echo "Go Golint"
 	golangci-lint run ./...
 
 fdl:
@@ -54,3 +57,4 @@ at: check_new build
 mock:
 	mockgen -source=internal/repository/repository.go -destination=internal/repository/mocks/mock_links_repo.go -package=mocks
 	mockgen -source=internal/service/service.go -destination=internal/service/mocks/mock_links_service.go -package=mocks
+	mockgen -source=internal/config/config.go -destination=internal/config/mocks/mock_links_config.go -package=mocks

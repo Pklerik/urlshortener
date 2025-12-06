@@ -14,9 +14,9 @@ type EnvMap map[string]string
 
 func Test_parseFlags(t *testing.T) {
 	tests := []struct {
-		name    string
-		envVars EnvMap
 		want    config.StartupFlagsParser
+		envVars EnvMap
+		name    string
 	}{
 		{name: "base",
 			envVars: EnvMap{"DATABASE_DSN": "postgresql://test_user:test_pass@localhost:5432/test_db?search_path=test_schema", "SECRET_KEY": "fH72anZI1e6YFLN+Psh6Dv308js8Ul+q3mfPe8E36Qs="},

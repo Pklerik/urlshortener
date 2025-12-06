@@ -26,13 +26,13 @@ type StartupFlagsParser interface {
 // StartupFlags app startup flags.
 type StartupFlags struct {
 	ServerAddress *Address     `env:"SERVER_ADDRESS"`
-	BaseURL       string       `env:"BASE_URL"`
-	LogLevel      string       `env:"LOG_LEVEL"`
-	LocalStorage  string       `env:"FILE_STORAGE_PATH"`
 	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
-	Timeout       float64
-	SecretKey     string `env:"SECRET_KEY"`
 	Audit         *audit.Audit
+	BaseURL       string `env:"BASE_URL"`
+	LogLevel      string `env:"LOG_LEVEL"`
+	LocalStorage  string `env:"FILE_STORAGE_PATH"`
+	SecretKey     string `env:"SECRET_KEY"`
+	Timeout       float64
 }
 
 // GetServerAddress returns ServerAddress.

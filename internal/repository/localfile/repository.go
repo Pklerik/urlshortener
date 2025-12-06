@@ -25,8 +25,8 @@ type LinksRepositoryFile struct {
 
 // FullData - all service data.
 type FullData struct {
-	Links []model.LinkData            `json:"links"`
 	Users map[model.UserID]model.User `json:"users"`
+	Links []model.LinkData            `json:"links"`
 }
 
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository

@@ -19,11 +19,11 @@ func TestAddress_Set(t *testing.T) {
 		address *Address
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr bool
 		want    want
+		name    string
+		args    args
+		fields  fields
+		wantErr bool
 	}{
 		{name: "base", args: args{flagValue: "http://127.0.0.1:8080"}, wantErr: false,
 			want: want{address: &Address{

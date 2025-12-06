@@ -22,11 +22,11 @@ func TestRegisterLinkHandler(t *testing.T) {
 	logger.Initialize("DEBUG")
 
 	type want struct {
-		code                int
-		response            string
 		Headers             map[string][]string
+		response            string
 		Location            string
 		AcceptedContentType []string
+		code                int
 	}
 	testURL := []byte("http://ya.ru")
 	redirectHost := "http://test_host:2345"
