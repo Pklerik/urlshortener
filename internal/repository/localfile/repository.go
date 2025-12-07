@@ -69,7 +69,6 @@ func (r *LinksRepositoryFile) SetLinks(_ context.Context, links []model.LinkData
 			continue
 		}
 
-		logger.Sugar.Infof("Short url: %s sets for long: %s", linkData.ShortURL, linkData.LongURL)
 		fullData.Links = append(fullData.Links, linkData)
 		fullData.Users[linkData.UserID] = model.User{ID: linkData.UserID}
 	}

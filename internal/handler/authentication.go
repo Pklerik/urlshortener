@@ -6,12 +6,36 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
+	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 	"github.com/samborkent/uuidv7"
 )
 
+// IAuthentication provide user authentication middleware.
+type IAuthentication interface {
+	AuthUser(next http.Handler) http.Handler
+	GetUserIDFromCookie(r *http.Request) (model.UserID, error)
+}
+
+var (
+	// ErrUnauthorizedUser - error for unauthorized user.
+	ErrUnauthorizedUser = errors.New("unauthorized user")
+)
+
+// AuthHandler provide user authentication middleware.
+type AuthHandler struct {
+	service service.LinkServicer
+}
+
+// NewAuthenticationHandler provide new instance of AuthHandler.
+func NewAuthenticationHandler(service service.LinkServicer) *AuthHandler {
+	return &AuthHandler{
+		service: service,
+	}
+}
+
 // AuthUser provide middleware for user authentication.
-func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
+func (ah *AuthHandler) AuthUser(next http.Handler) http.Handler {
 	cookieName := "auth_user"
 	authFn := func(w http.ResponseWriter, r *http.Request) {
 		cookieAuth, err := r.Cookie(cookieName)
@@ -21,7 +45,7 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 		}
 
 		if errors.Is(err, http.ErrNoCookie) {
-			secretKey, ok := lh.service.GetSecret("SECRET_KEY")
+			secretKey, ok := ah.service.GetSecret("SECRET_KEY")
 			if !ok {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -56,7 +80,7 @@ func (lh *LinkHandle) AuthUser(next http.Handler) http.Handler {
 }
 
 // GetUserIDFromCookie provide userId auth info.
-func (lh *LinkHandle) GetUserIDFromCookie(r *http.Request) (model.UserID, error) {
+func (ah *AuthHandler) GetUserIDFromCookie(r *http.Request) (model.UserID, error) {
 	authCookie, err := r.Cookie("auth_user")
 	if errors.Is(err, http.ErrNoCookie) {
 		logger.Sugar.Infof(`Unable to find auth_user cookie: %d`, http.StatusUnauthorized)
@@ -68,7 +92,7 @@ func (lh *LinkHandle) GetUserIDFromCookie(r *http.Request) (model.UserID, error)
 		logger.Sugar.Infof(`Unable to get cookie: status: %d`, http.StatusInternalServerError)
 	}
 
-	secretKey, ok := lh.service.GetSecret("SECRET_KEY")
+	secretKey, ok := ah.service.GetSecret("SECRET_KEY")
 	if !ok {
 		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
 	}

@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	parsedArgs := parseFlags()
+	parsedArgs := parseArgs()
 
 	err := logger.Initialize(parsedArgs.GetLogLevel())
 	if err != nil {

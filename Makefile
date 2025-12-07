@@ -11,21 +11,21 @@ test:
 	cat cover.tmp.out | grep -v "main.go" > cover.out
 	go tool cover -func cover.out
 	echo "-----------------------------------------------------------------------------------"
-
-bench:
-	go test -bench=BenchmarkExecute -benchmem -benchtime 5s -count 5
 	
+bench: 
+	go test -bench=. -benchmem -benchtime=100ms -run=^$$ ./...
+
 pprof:
-	go test -bench=BenchmarkExecute -benchmem -benchtime 5s -count 5 -cpuprofile cpu.out -memprofile mem.out
+	go test -v ./internal/router -bench=. -benchmem -benchtime 10s -cpuprofile profiles/cpu.out -memprofile profiles/mem.out
 
 pprof-mem:
-	go tool pprof -http :9000 mem.out
+	go tool pprof -http :9000 profiles/mem.out
 
 pprof-cpu:
-	go tool pprof -http :9000 cpu.out
+	go tool pprof -http :9000 profiles/cpu.out
 
 lint:
-	go vet -vettool=$(which statictest) ./...
+	go vet -vettool=$$(which statictest) ./...
 	golangci-lint run ./...
 
 fdl:
@@ -51,5 +51,6 @@ at: check_new build
     done
 	echo "DONE"
 	
-repo_mock:
+mock:
 	mockgen -source=internal/repository/repository.go -destination=internal/repository/mocks/mock_links_repo.go -package=mocks
+	mockgen -source=internal/service/service.go -destination=internal/service/mocks/mock_links_service.go -package=mocks

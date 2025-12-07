@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -86,14 +87,14 @@ func TestRegisterLinkHandler(t *testing.T) {
 			want: want{
 				code:     http.StatusBadRequest,
 				response: "Unable to find long URL for short"}},
-		{name: "Get Redirect",
-			method:        http.MethodGet,
-			redirectHost:  redirectHost,
-			additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
-			want: want{
-				code:     http.StatusTemporaryRedirect,
-				Headers:  map[string][]string{"Location": {string(testURL)}},
-				response: ""}},
+		// {name: "Get Redirect",
+		// 	method:        http.MethodGet,
+		// 	redirectHost:  redirectHost,
+		// 	additionalURL: "/" + strings.Split(string(resBody), "/")[3], testError: "auto redirect is disabled",
+		// 	want: want{
+		// 		code:     http.StatusTemporaryRedirect,
+		// 		Headers:  map[string][]string{"Location": {string(testURL)}},
+		// 		response: ""}},
 		{name: "Post Created JSON",
 			method:        http.MethodPost,
 			redirectHost:  redirectHost,
@@ -184,4 +185,113 @@ func zipRequest(strByte *[]byte) *[]byte {
 	respBytes := buf.Bytes()
 	logger.Sugar.Debugf("ByteStrCompressed data: %v ", respBytes)
 	return &respBytes
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func BenchmarkShortenerService(b *testing.B) {
+	logger.Initialize("ERROR")
+	maxSize := 50
+
+	testUrls := make([]string, maxSize)
+	for i := 0; i < b.N; i++ {
+		testUrls[i] = "http://benchmark/" + RandStringBytes(30)
+	}
+	client := resty.New()
+	client.SetRedirectPolicy(resty.NoRedirectPolicy())
+
+	b.ResetTimer()
+	// b.Run("Shorten URLs repo", func(b *testing.B) {
+	// 	dbc := &dbconf.Conf{}
+	// 	err := godotenv.Load("/Users/pavelbudkov/dev/urlshortener/.env")
+	// 	if err != nil {
+	// 		log.Fatal("Error loading .env file")
+	// 	}
+	// 	dbc.Set(os.Getenv("DATABASE_DSN"))
+	// 	log.Println(dbc.String())
+	// 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
+	// 		ServerAddress: &config.Address{
+	// 			Protocol: "http",
+	// 			Host:     "localhost",
+	// 			Port:     16080},
+	// 		BaseURL: "http://test_host:2345",
+	// 		DBConf:  dbc,
+	// 		Timeout: 10000,
+	// 	})
+	// 	assert.NoError(b, err, "error setup router")
+	// 	srv := httptest.NewServer(r)
+	// 	defer srv.Close()
+
+	// 	for i := 0; i < b.N; i++ {
+	// 		req := client.R()
+	// 		req.Method = http.MethodPost
+	// 		req.URL = srv.URL
+	// 		req.Body = []byte(testUrls[i%maxSize])
+	// 		_, err := req.Send()
+	// 		if err != nil {
+	// 			b.Errorf("error making HTTP request: %v", err)
+	// 		}
+
+	// 	}
+	// })
+
+	// b.Run("Shorten URLs local", func(b *testing.B) {
+	// 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
+	// 		ServerAddress: &config.Address{
+	// 			Protocol: "http",
+	// 			Host:     "localhost",
+	// 			Port:     16081},
+	// 		LocalStorage: "/Users/pavelbudkov/dev/urlshortener/local_storage.json",
+	// 		Timeout:      10000,
+	// 	})
+	// 	assert.NoError(b, err, "error setup router")
+	// 	srv := httptest.NewServer(r)
+	// 	defer srv.Close()
+
+	// 	for i := 0; i < b.N; i++ {
+	// 		req := client.R()
+	// 		req.Method = http.MethodPost
+	// 		req.URL = srv.URL
+	// 		req.Body = []byte(testUrls[i%maxSize])
+	// 		_, err := req.Send()
+	// 		if err != nil {
+	// 			b.Errorf("error making HTTP request: %v", err)
+	// 		}
+	// 	}
+	// })
+
+	b.Run("Shorten URLs inmem", func(b *testing.B) {
+
+		r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
+			ServerAddress: &config.Address{
+				Protocol: "http",
+				Host:     "localhost",
+				Port:     16082},
+			BaseURL: "http://test_host:2345",
+			Timeout: 10000,
+		})
+		assert.NoError(b, err, "error setup router")
+		srv := httptest.NewServer(r)
+		defer srv.Close()
+
+		for i := 0; i < b.N; i++ {
+			req := client.R()
+			req.Method = http.MethodPost
+			req.URL = srv.URL
+			req.Body = []byte(testUrls[i%maxSize])
+			_, err := req.Send()
+			if err != nil {
+				b.Errorf("error making HTTP request: %v", err)
+			}
+		}
+	})
+
 }

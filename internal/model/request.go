@@ -11,6 +11,12 @@ type Requester interface {
 	String() string
 }
 
+// RequestTextPlainHandler provide interface for handling text/plain requests.
+type RequestTextPlainHandler interface {
+	Requester
+	SetBody(body string)
+}
+
 // Request provide request for shortener.
 type Request struct {
 	URL string `json:"url"`
@@ -19,6 +25,11 @@ type Request struct {
 // String (req *Request) returns string representation of interface realization.
 func (req *Request) String() string {
 	return fmt.Sprintf("Request{URL: %s}", req.URL)
+}
+
+// SetBody set body to Request.
+func (req *Request) SetBody(body string) {
+	req.URL = body
 }
 
 // ReqPostBatch provide batch contract.

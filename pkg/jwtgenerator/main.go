@@ -18,7 +18,7 @@ var (
 	ErrTokenValidation = errors.New("error token validation")
 )
 
-// ErrSigningMethodNotHMAC - error signing method not hmac
+// ErrSigningMethodNotHMAC - error signing method not hmac.
 type ErrSigningMethodNotHMAC struct {
 	headerAlg string
 }

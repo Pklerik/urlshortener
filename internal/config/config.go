@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Pklerik/urlshortener/internal/config/audit"
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
 )
 
@@ -19,6 +20,7 @@ type StartupFlagsParser interface {
 	GetLocalStorage() string
 	GetDatabaseConf() (dbconf.DBConfigurer, error)
 	GetSecretKey() string
+	GetAudit() *audit.Audit
 }
 
 // StartupFlags app startup flags.
@@ -30,6 +32,7 @@ type StartupFlags struct {
 	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
 	Timeout       float64
 	SecretKey     string `env:"SECRET_KEY"`
+	Audit         *audit.Audit
 }
 
 // GetServerAddress returns ServerAddress.
@@ -73,6 +76,11 @@ func (sf *StartupFlags) GetDatabaseConf() (dbconf.DBConfigurer, error) {
 	}
 
 	return sf.DBConf, nil
+}
+
+// GetAudit returns Audit config.
+func (sf *StartupFlags) GetAudit() *audit.Audit {
+	return sf.Audit
 }
 
 // Address base struct.

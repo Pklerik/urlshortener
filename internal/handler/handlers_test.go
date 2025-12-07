@@ -70,8 +70,10 @@ func TestLinkHandle_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ls := links.NewLinksService(r, baseConfig.GetSecretKey())
 			lh := NewLinkHandler(
 				links.NewLinksService(r, baseConfig.GetSecretKey()),
+				NewAuthenticationHandler(ls),
 				tt.fields.Args,
 			)
 			rctx := chi.NewRouteContext()
@@ -114,6 +116,7 @@ func TestLinkHandle_PostText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lh := NewLinkHandler(
 				tt.fields.linkService,
+				NewAuthenticationHandler(tt.fields.linkService),
 				tt.fields.Args,
 			)
 			lh.PostText(tt.args.w, tt.args.r)
@@ -150,6 +153,7 @@ func TestLinkHandle_PostJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lh := NewLinkHandler(
 				tt.fields.linkService,
+				NewAuthenticationHandler(tt.fields.linkService),
 				tt.fields.Args,
 			)
 			lh.PostText(tt.args.w, tt.args.r)
@@ -189,6 +193,7 @@ func TestLinkHandle_PingDB(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lh := NewLinkHandler(
 				tt.fields.linkService,
+				NewAuthenticationHandler(tt.fields.linkService),
 				tt.fields.Args,
 			)
 			lh.PingDB(tt.args.w, tt.args.r)
@@ -242,9 +247,32 @@ func TestLinkHandle_PostBatchJSON(t *testing.T) {
 			tt.args.r.Header.Set("Content-Type", "application/json")
 			lh := &LinkHandle{
 				service: tt.fields.linkService,
+				ah:      NewAuthenticationHandler(tt.fields.linkService),
 				Args:    tt.fields.Args,
 			}
 			lh.PostBatchJSON(tt.args.w, tt.args.r)
 		})
 	}
+}
+
+// ExampleGet demonstrates how to use Get method of LinkHandler.
+func ExampleGet() {
+	ctrl := gomock.NewController(nil)
+	r := mock_repository.NewMockLinksRepository(ctrl)
+
+	defer ctrl.Finish()
+	r.EXPECT().FindShort(gomock.Any(), "398f0ca4").Return(model.LinkData{UUID: "123", ShortURL: "398f0ca4", LongURL: "http://ya.ru"}, nil).AnyTimes()
+
+	ls := links.NewLinksService(r, baseConfig.GetSecretKey())
+	lh := NewLinkHandler(
+		links.NewLinksService(r, baseConfig.GetSecretKey()),
+		NewAuthenticationHandler(ls),
+		baseConfig,
+	)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("shortURL", "398f0ca4")
+	req := httptest.NewRequest("GET", "/398f0ca4", nil)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	lh.Get(httptest.NewRecorder(), req)
+	// Output:
 }
