@@ -1,3 +1,4 @@
+// Package main for entrypoint reset program.
 package main
 
 import (
@@ -14,7 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
+	"syscall" //nolint needs to call sigterm for asinc program termination.
 
 	"github.com/samborkent/uuidv7"
 )
@@ -25,6 +26,7 @@ var (
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+
 	log.Println("Starts resetting")
 
 	go func() {
@@ -40,25 +42,32 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		basePath := filepath.Dir(filepath.Dir(dir))
+
 		err = filepath.Walk(basePath, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				// Handle errors that occurred during the walk
-				fmt.Printf("Error accessing path %s: %v\n", path, err)
+				log.Printf("Error accessing path %s: %v\n", path, err)
 				return err // Continue walking or return a specific error
 			}
+
 			if !strings.HasSuffix(info.Name(), ".go") {
 				return nil
 			}
+
 			if strings.Contains(info.Name(), ".gen.") {
 				return nil
 			}
+
 			fileCh <- path
+
 			return nil
 		})
 		if err != nil {
-			fmt.Printf("Error during file system walk: %v\n", err)
+			log.Printf("Error during file system walk: %v\n", err)
 		}
+
 		close(fileCh)
 	}()
 
@@ -69,46 +78,48 @@ func main() {
 		default:
 			doGReset(ctx, path)
 		}
-
 	}
 }
 
 func doGReset(_ context.Context, path string) {
 	fset := token.NewFileSet()
+
 	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	structs := make([]*ast.StructType, 0, 2)
 	names := make([]string, 0, 2)
+
 	for _, decl := range f.Decls {
 		if genDecl, ok := decl.(*ast.GenDecl); ok {
 			for _, spec := range genDecl.Specs {
 				if typeSpec, ok := spec.(*ast.TypeSpec); ok {
 					if structWithReset, isStruct := typeSpec.Type.(*ast.StructType); isStruct {
-
 						if genDecl.Doc != nil {
 							// genDecl.Doc contains the comment group above the struct
 							for _, comment := range genDecl.Doc.List {
 								if strings.Contains(comment.Text, "generate:reset") {
 									structs = append(structs, structWithReset)
 									names = append(names, typeSpec.Name.Name)
-
 								}
 							}
 						}
 					}
 				}
 			}
-
 		}
 	}
+
 	if len(structs) > 0 {
 		buf := generateResetMethod(structs, names, f.Name.Name)
-		err := writeGenereted(buf, path)
+
+		err := writeGenerated(buf, path)
 		if err != nil {
 			log.Fatalf("unable to write file for %s", path)
 		}
+
 		log.Printf("setup Reset() for structs in %s\n", path)
 	}
 }
@@ -125,9 +136,11 @@ func (rs *` + names[i] + `) Reset() {
 	if rs == nil {
         return
 		}` + "\n")
+
 		for _, field := range s.Fields.List {
 			fieldName := ""
 			fieldResetter := ""
+
 			if len(field.Names) > 0 {
 				fieldName = field.Names[0].Name
 
@@ -147,6 +160,7 @@ func (rs *` + names[i] + `) Reset() {
 						`.(interface{ Reset() }); ok && rs.` + fieldName +
 						` != nil {\nresetter.Reset()\n}\n`
 				}
+
 				buf.WriteString("\t" + fieldResetter)
 			} else {
 				// Handle embedded fields (e.g., `*MyEmbeddedStruct`)
@@ -162,10 +176,11 @@ func (rs *` + names[i] + `) Reset() {
 					buf.WriteString("\t" + fieldResetter)
 				}
 			}
-
 		}
+
 		buf.WriteString("}\n\n")
 	}
+
 	return buf
 }
 
@@ -173,24 +188,28 @@ func primitiveStrVal(t *ast.Ident) string {
 	if t.Name == "string" {
 		return `""`
 	}
+
 	if t.Name == "UUIDv7" || t.Name == "UserID" {
 		return `"` + uuidv7.New().String() + `"`
 	}
+
 	if strings.Contains(t.Name, "float") || strings.Contains(t.Name, "int") {
 		return "0"
 	}
+
 	if t.Name == "bool" {
 		return "false"
 	}
+
 	return ""
 }
 
-func writeGenereted(buf *bytes.Buffer, path string) error {
+func writeGenerated(buf *bytes.Buffer, path string) error {
 	pathGen := path[:len(path)-2] + "gen.go"
-	fmt.Println(buf.String())
+
 	bufFmt, err := format.Source(buf.Bytes())
 	if err != nil {
-		return err
+		return fmt.Errorf("writeGenerated: %w", err)
 	}
 	return os.WriteFile(pathGen, bufFmt, 0664)
 }

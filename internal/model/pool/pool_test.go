@@ -24,7 +24,7 @@ func TestPool_Get(t *testing.T) {
 
 	t.Run("model.LinkData", func(t *testing.T) {
 		// TODO: construct the receiver type.
-		var p *pool.Pool[*model.LinkData] = pool.New[*model.LinkData](5)
+		var p = pool.New[*model.LinkData](5)
 
 		got := p.Get()
 		// TODO: update the condition below to compare got with tt.want.
@@ -35,7 +35,7 @@ func TestPool_Get(t *testing.T) {
 
 	t.Run("model.Reques", func(t *testing.T) {
 		// TODO: construct the receiver type.
-		var p *pool.Pool[*model.Request] = pool.New[*model.Request](5)
+		var p = pool.New[*model.Request](5)
 
 		got := p.Get()
 		// TODO: update the condition below to compare got with tt.want.
@@ -50,8 +50,8 @@ func TestPool_Put(t *testing.T) {
 	t.Run("model.LinkData", func(t *testing.T) {
 		// TODO: construct the receiver type.
 		var (
-			p    *pool.Pool[*model.LinkData] = pool.New[*model.LinkData](5)
-			data                             = model.LinkData{}
+			p    = pool.New[*model.LinkData](5)
+			data = model.LinkData{}
 		)
 
 		p.Put(&data)
@@ -60,8 +60,8 @@ func TestPool_Put(t *testing.T) {
 	t.Run("model.Reques", func(t *testing.T) {
 		// TODO: construct the receiver type.
 		var (
-			p    *pool.Pool[*model.Request] = pool.New[*model.Request](5)
-			data                            = model.Request{}
+			p    = pool.New[*model.Request](5)
+			data = model.Request{}
 		)
 
 		p.Put(&data)
