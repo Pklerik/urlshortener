@@ -18,38 +18,45 @@ import (
 	"syscall" //nolint needs to call sigterm for asinc program termination.
 
 	"github.com/samborkent/uuidv7"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
-	fileCh = make(chan string)
+	fileCh = make(chan string, 100)
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	log.Println("Starts resetting")
 
+	// Setup signal handler
 	go func() {
-		c := make(chan os.Signal, 1) // we need to reserve to buffer size 1, so the notifier are not blocked
+		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
 		<-c
 		cancel()
 	}()
 
-	go func() {
+	// Use errgroup to manage file processing goroutine
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	// Goroutine to walk files and send them to channel
+	eg.Go(func() error {
+		defer close(fileCh)
+
 		dir, err := os.Getwd()
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("getwd: %w", err)
 		}
 
 		basePath := filepath.Dir(filepath.Dir(dir))
 
 		err = filepath.Walk(basePath, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
-				// Handle errors that occurred during the walk
 				log.Printf("Error accessing path %s: %v\n", path, err)
-				return err // Continue walking or return a specific error
+				return err
 			}
 
 			if !strings.HasSuffix(info.Name(), ".go") {
@@ -60,33 +67,45 @@ func main() {
 				return nil
 			}
 
-			fileCh <- path
+			select {
+			case fileCh <- path:
+			case <-egCtx.Done():
+				return egCtx.Err()
+			}
 
 			return nil
 		})
 		if err != nil {
-			log.Printf("Error during file system walk: %v\n", err)
+			return fmt.Errorf("filepath.Walk: %w", err)
 		}
 
-		close(fileCh)
-	}()
+		return nil
+	})
 
+	// Process files
 	for path := range fileCh {
 		select {
-		case <-ctx.Done():
+		case <-egCtx.Done():
 			return
 		default:
-			doGReset(ctx, path)
+			if err := doGReset(egCtx, path); err != nil {
+				log.Printf("Error processing %s: %v\n", path, err)
+			}
 		}
+	}
+
+	// Wait for file walking goroutine to complete
+	if err := eg.Wait(); err != nil {
+		log.Fatalf("Error: %v\n", err)
 	}
 }
 
-func doGReset(_ context.Context, path string) {
+func doGReset(ctx context.Context, path string) error {
 	fset := token.NewFileSet()
 
 	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("parse %s: %w", path, err)
 	}
 
 	structs := make([]*ast.StructType, 0, 2)
@@ -117,11 +136,13 @@ func doGReset(_ context.Context, path string) {
 
 		err := writeGenerated(buf, path)
 		if err != nil {
-			log.Fatalf("unable to write file for %s", path)
+			return fmt.Errorf("write generated for %s: %w", path, err)
 		}
 
 		log.Printf("setup Reset() for structs in %s\n", path)
 	}
+
+	return nil
 }
 
 func generateResetMethod(structs []*ast.StructType, names []string, pkgName string) *bytes.Buffer {
