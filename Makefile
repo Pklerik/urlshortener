@@ -6,9 +6,9 @@ upd_test:
 	git fetch template && git checkout template/main .github
 
 test:
-	go test  -cover -coverprofile cover.tmp.out -coverpkg=./internal/... ./cmd/... ./api/... ./pkg/...
+	go test  -cover -coverprofile cover.tmp.out -coverpkg=./internal/... ./cmd/... ./pkg/...
 	echo "-----------------------------------------------------------------------------------" 
-	go tool cover -func cover.temp.out
+	go tool cover -func cover.tmp.out
 	echo "-----------------------------------------------------------------------------------"
 	
 bench: 
