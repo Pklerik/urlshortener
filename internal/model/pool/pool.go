@@ -1,6 +1,8 @@
 // Package pool provide pool schema.
 package pool
 
+import "sync"
+
 // Type provide interface for resettable types.
 type Type interface {
 	Reset()
@@ -8,27 +10,26 @@ type Type interface {
 
 // Pool generic struct for all Resettable types.
 type Pool[T Type] struct {
-	items []T
+	pool sync.Pool
 }
 
 // New provide new Pool with size.
-func New[T Type](size int) *Pool[T] {
-	return &Pool[T]{items: make([]T, size)}
+func New[T Type]() *Pool[T] {
+	return &Pool[T]{pool: sync.Pool{New: func() any {
+		return new(T)
+	}}}
 }
 
-// Get take item from Pool.items []T.
+// Get take item from Pool.pool []T.
 func (p *Pool[T]) Get() *T {
-	if len(p.items) == 0 {
-		return nil
+	item := p.pool.Get()
+	if item != nil {
+		return item.(*T)
 	}
-
-	item := p.items[len(p.items)-1]
-	p.items = p.items[:len(p.items)-1]
-
-	return &item
+	return new(T)
 }
 
-// Put store item in Pool.items []T.
+// Put store item in Pool.pool []T.
 func (p *Pool[T]) Put(item T) {
-	p.items = append(p.items, item)
+	p.pool.Put(item)
 }
