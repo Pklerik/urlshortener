@@ -42,6 +42,10 @@ func parseArgs() config.StartupFlagsParser {
 		parsedArgs.Audit.LogURLPath = envArgs.Audit.LogURLPath
 	}
 
+	if envArgs.Tls {
+		parsedArgs.Tls = envArgs.Tls
+	}
+
 	return parsedArgs
 }
 
@@ -59,6 +63,7 @@ func parseFlags() *config.StartupFlags {
 	flag.StringVar(&parsedArgs.SecretKey, "secret_key", "secret_key", "Secret key for crypto")
 	flag.StringVar(&parsedArgs.Audit.LogFilePath, "audit_file", "", "File path for audit log")
 	flag.StringVar(&parsedArgs.Audit.LogURLPath, "audit_url", "", "URL path for audit log")
+	flag.BoolVar(&parsedArgs.Tls, "s", false, "use tls Listener ")
 	flag.Parse()
 
 	return parsedArgs

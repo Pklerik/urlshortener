@@ -21,6 +21,7 @@ type StartupFlagsParser interface {
 	GetDatabaseConf() (dbconf.DBConfigurer, error)
 	GetSecretKey() string
 	GetAudit() *audit.Audit
+	GetTls() bool
 }
 
 // StartupFlags app startup flags.
@@ -33,6 +34,7 @@ type StartupFlags struct {
 	LocalStorage  string `env:"FILE_STORAGE_PATH"`
 	SecretKey     string `env:"SECRET_KEY"`
 	Timeout       float64
+	Tls           bool `env:"ENABLE_HTTPS"`
 }
 
 // GetServerAddress returns ServerAddress.
@@ -81,6 +83,10 @@ func (sf *StartupFlags) GetDatabaseConf() (dbconf.DBConfigurer, error) {
 // GetAudit returns Audit config.
 func (sf *StartupFlags) GetAudit() *audit.Audit {
 	return sf.Audit
+}
+
+func (sf *StartupFlags) GetTls() bool {
+	return sf.Tls
 }
 
 // Address base struct.
