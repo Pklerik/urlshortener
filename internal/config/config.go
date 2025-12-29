@@ -3,6 +3,10 @@ package config
 
 import (
 	"fmt"
+	"reflect" // nolint:depguard // used for config merging
+
+	"github.com/goccy/go-json"
+
 	"strconv"
 	"strings"
 	"time"
@@ -21,20 +25,21 @@ type StartupFlagsParser interface {
 	GetDatabaseConf() (dbconf.DBConfigurer, error)
 	GetSecretKey() string
 	GetAudit() *audit.Audit
-	GetTls() bool
+	GetTLS() bool
 }
 
 // StartupFlags app startup flags.
 type StartupFlags struct {
-	ServerAddress *Address     `env:"SERVER_ADDRESS"`
-	DBConf        *dbconf.Conf `env:"DATABASE_DSN"`
-	Audit         *audit.Audit
-	BaseURL       string `env:"BASE_URL"`
-	LogLevel      string `env:"LOG_LEVEL"`
-	LocalStorage  string `env:"FILE_STORAGE_PATH"`
-	SecretKey     string `env:"SECRET_KEY"`
-	Timeout       float64
-	Tls           bool `env:"ENABLE_HTTPS"`
+	ServerAddress *Address     `json:"server_address" env:"SERVER_ADDRESS"`
+	DBConf        *dbconf.Conf `json:"database_dsn" env:"DATABASE_DSN"`
+	Audit         *audit.Audit `json:"audit" env:"AUDIT"`
+	BaseURL       string       `json:"base_url" env:"BASE_URL"`
+	LogLevel      string       `json:"log_level" env:"LOG_LEVEL"`
+	LocalStorage  string       `json:"local_storage_path" env:"FILE_STORAGE_PATH"`
+	SecretKey     string       `json:"secret_key" env:"SECRET_KEY"`
+	FileConfig    string       `env:"CONFIG"`
+	Timeout       float64      `json:"timeout" env:"SERVER_TIMEOUT"`
+	TLS           bool         `json:"enable_https" env:"ENABLE_HTTPS"`
 }
 
 // GetServerAddress returns ServerAddress.
@@ -85,8 +90,9 @@ func (sf *StartupFlags) GetAudit() *audit.Audit {
 	return sf.Audit
 }
 
-func (sf *StartupFlags) GetTls() bool {
-	return sf.Tls
+// GetTLS returns TLS.
+func (sf *StartupFlags) GetTLS() bool {
+	return sf.TLS
 }
 
 // Address base struct.
@@ -156,6 +162,86 @@ func (a *Address) Set(flagValue string) error {
 	a.Port = port
 	if a.Port == 0 {
 		a.Port = 8080
+	}
+
+	return nil
+}
+
+// UnmarshalJSON provide custom unmarshaling for StartupFlags.
+func (sf *StartupFlags) UnmarshalJSON(data []byte) error {
+	unmarshalMap := make(map[string]interface{}, reflect.TypeOf(*sf).NumField())
+
+	err := json.Unmarshal(data, &unmarshalMap)
+	if err != nil {
+		return fmt.Errorf("UnmarshalJSON: %w", err)
+	}
+
+	for key, value := range unmarshalMap {
+		switch key {
+		case "timeout":
+			if v, ok := value.(float64); ok {
+				sf.Timeout = v
+			}
+		case "server_address":
+			if v, ok := value.(string); ok {
+				adr := Address{}
+				if err := adr.UnmarshalText([]byte(v)); err != nil {
+					return fmt.Errorf("UnmarshalJSON server_address: %w", err)
+				}
+
+				if sf.ServerAddress == nil {
+					sf.ServerAddress = new(Address)
+				}
+
+				*(sf.ServerAddress) = adr
+			}
+		case "db_conf":
+			if v, ok := value.(string); ok {
+				dbConf := &dbconf.Conf{}
+
+				err := json.Unmarshal([]byte(v), dbConf)
+				if err != nil {
+					return fmt.Errorf("UnmarshalJSON db_conf: %w", err)
+				}
+
+				if sf.DBConf == nil {
+					sf.DBConf = new(dbconf.Conf)
+				}
+
+				(*sf.DBConf) = (*dbConf)
+			}
+		case "base_url":
+			if v, ok := value.(string); ok {
+				sf.BaseURL = v
+			}
+		case "log_level":
+			if v, ok := value.(string); ok {
+				sf.LogLevel = v
+			}
+		case "file_storage_path":
+			if v, ok := value.(string); ok {
+				sf.LocalStorage = v
+			}
+		case "secret_key":
+			if v, ok := value.(string); ok {
+				sf.SecretKey = v
+			}
+		case "audit":
+			if v, ok := value.(string); ok {
+				auditConf := &audit.Audit{}
+
+				err := json.Unmarshal([]byte(v), auditConf)
+				if err != nil {
+					return fmt.Errorf("UnmarshalJSON audit: %w", err)
+				}
+
+				sf.Audit = auditConf
+			}
+		case "enable_https":
+			if v, ok := value.(bool); ok {
+				sf.TLS = v
+			}
+		}
 	}
 
 	return nil

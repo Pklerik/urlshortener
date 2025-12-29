@@ -96,11 +96,13 @@ func main() {
 
 	// Wait for file walking goroutine to complete
 	if err := eg.Wait(); err != nil {
+		cancel()
+		// nolint:gocritic // log fatal on main error with no deferring cancel.
 		log.Fatalf("Error: %v\n", err)
 	}
 }
 
-func doGReset(ctx context.Context, path string) error {
+func doGReset(_ context.Context, path string) error {
 	fset := token.NewFileSet()
 
 	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
@@ -232,5 +234,6 @@ func writeGenerated(buf *bytes.Buffer, path string) error {
 	if err != nil {
 		return fmt.Errorf("writeGenerated: %w", err)
 	}
-	return os.WriteFile(pathGen, bufFmt, 0664)
+
+	return fmt.Errorf("writeGenerated: %w", os.WriteFile(pathGen, bufFmt, 0600))
 }

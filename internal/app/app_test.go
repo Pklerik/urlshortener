@@ -27,6 +27,7 @@ func TestStartApp_SuccessfulStartup(t *testing.T) {
 	mockParser.EXPECT().GetLocalStorage().Return("").AnyTimes()
 	mockParser.EXPECT().GetTimeout().Return(5 * time.Second).AnyTimes()
 	mockParser.EXPECT().GetSecretKey().Return("secret").AnyTimes()
+	mockParser.EXPECT().GetTLS().Return(false).AnyTimes()
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
@@ -45,6 +46,7 @@ func TestStartApp_InvalidPort(t *testing.T) {
 	mockParser.EXPECT().GetLocalStorage().Return("").AnyTimes()
 	mockParser.EXPECT().GetTimeout().Return(5 * time.Second).AnyTimes()
 	mockParser.EXPECT().GetSecretKey().Return("secret").AnyTimes()
+	mockParser.EXPECT().GetTLS().Return(false).AnyTimes()
 
 	StartApp(mockParser)
 }

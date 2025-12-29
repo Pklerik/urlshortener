@@ -1,3 +1,4 @@
+// Package criptography provides functions for generating and managing TLS certificates and keys.
 package criptography
 
 import (
@@ -16,15 +17,8 @@ import (
 	"time"
 )
 
-type keyPair struct {
-	CertPEMFile       string
-	PrivateKeyPEMFile string
-}
-
-func genSertKey(path string) (keyPair, error) {
-	errText := "unable to generate cert sequence err: "
-	// создаём шаблон сертификата
-	cert := &x509.Certificate{
+var (
+	cert = &x509.Certificate{
 		// указываем уникальный номер сертификата
 		SerialNumber: big.NewInt(1658),
 		// заполняем базовую информацию о владельце сертификата
@@ -44,67 +38,26 @@ func genSertKey(path string) (keyPair, error) {
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
+)
 
-	// создаём новый приватный RSA-ключ длиной 4096 бит
-	// обратите внимание, что для генерации ключа и сертификата
-	// используется rand.Reader в качестве источника случайных данных
-	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	// создаём сертификат x.509
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	// кодируем сертификат и ключ в формате PEM, который
-	// используется для хранения и обмена криптографическими ключами
-	var certPEM bytes.Buffer
-	err = pem.Encode(&certPEM, &pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
-	if err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	var privateKeyPEM bytes.Buffer
-	err = pem.Encode(&privateKeyPEM, &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-	if err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	err = os.MkdirAll(path, os.ModePerm)
-	if err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	if err = os.WriteFile(filepath.Join(path, "cert.pem"), certPEM.Bytes(), 0644); err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-
-	if err = os.WriteFile(filepath.Join(path, "private.pem"), privateKeyPEM.Bytes(), 0644); err != nil {
-		return keyPair{}, fmt.Errorf(errText+" %w", err)
-	}
-	return keyPair{
-		CertPEMFile:       filepath.Join(path, "cert.pem"),
-		PrivateKeyPEMFile: filepath.Join(path, "private.pem"),
-	}, nil
+// KeyPair holds the file paths for the certificate and private key.
+type KeyPair struct {
+	CertPEMFile       string
+	PrivateKeyPEMFile string
 }
 
-func GetSertKey(path string) (keyPair, error) {
+// GetSertKey checks if certificate and private key files exist in the specified path.
+// If they do not exist, it generates new ones.
+// It returns the paths to the certificate and private key files.
+func GetSertKey(path string) (KeyPair, error) {
 	certPath := filepath.Join(path, "cert.pem")
 	privateKeyPath := filepath.Join(path, "private.pem")
 
 	if !fileExists(certPath) || !fileExists(privateKeyPath) {
 		return genSertKey(path)
 	}
-	return keyPair{
+
+	return KeyPair{
 		CertPEMFile:       certPath,
 		PrivateKeyPEMFile: privateKeyPath,
 	}, nil
@@ -124,4 +77,62 @@ func fileExists(path string) bool {
 	// In most cases, you might still consider the file as "not existing" for a simple check,
 	// but it's important to handle or log the underlying error if necessary.
 	return false
+}
+
+func genSertKey(path string) (KeyPair, error) {
+	// создаём шаблон сертификата
+
+	// создаём новый приватный RSA-ключ длиной 4096 бит
+	// обратите внимание, что для генерации ключа и сертификата
+	// используется rand.Reader в качестве источника случайных данных
+	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	// создаём сертификат x.509
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	// кодируем сертификат и ключ в формате PEM, который
+	// используется для хранения и обмена криптографическими ключами
+	var certPEM bytes.Buffer
+
+	err = pem.Encode(&certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	var privateKeyPEM bytes.Buffer
+
+	err = pem.Encode(&privateKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	err = os.MkdirAll(path, 0750)
+	if err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	if err = os.WriteFile(filepath.Join(path, "cert.pem"), certPEM.Bytes(), 0600); err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	if err = os.WriteFile(filepath.Join(path, "private.pem"), privateKeyPEM.Bytes(), 0600); err != nil {
+		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+	}
+
+	return KeyPair{
+		CertPEMFile:       filepath.Join(path, "cert.pem"),
+		PrivateKeyPEMFile: filepath.Join(path, "private.pem"),
+	}, nil
 }

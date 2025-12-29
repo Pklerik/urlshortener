@@ -50,11 +50,12 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-
-		if parsedArgs.GetTls() {
+		if parsedArgs.GetTLS() {
 			return runTLSListener(httpServer)
 		}
+
 		logger.Sugar.Infof("Starting server")
+
 		return httpServer.ListenAndServe()
 	})
 	g.Go(func() error {
@@ -83,6 +84,8 @@ func runTLSListener(httpServer *http.Server) error {
 	if err != nil {
 		logger.Sugar.Errorf("unable to generate cert sequence err: %v", err)
 	}
+
 	logger.Sugar.Infof("Starting server with TLS")
-	return httpServer.ListenAndServeTLS(keys.CertPEMFile, keys.PrivateKeyPEMFile)
+
+	return fmt.Errorf("unable to start server with TLS: %w", httpServer.ListenAndServeTLS(keys.CertPEMFile, keys.PrivateKeyPEMFile))
 }

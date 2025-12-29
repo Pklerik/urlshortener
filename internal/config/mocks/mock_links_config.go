@@ -136,6 +136,20 @@ func (mr *MockStartupFlagsParserMockRecorder) GetServerAddress() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServerAddress", reflect.TypeOf((*MockStartupFlagsParser)(nil).GetServerAddress))
 }
 
+// GetTLS mocks base method.
+func (m *MockStartupFlagsParser) GetTLS() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTLS")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// GetTLS indicates an expected call of GetTLS.
+func (mr *MockStartupFlagsParserMockRecorder) GetTLS() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTLS", reflect.TypeOf((*MockStartupFlagsParser)(nil).GetTLS))
+}
+
 // GetTimeout mocks base method.
 func (m *MockStartupFlagsParser) GetTimeout() time.Duration {
 	m.ctrl.T.Helper()

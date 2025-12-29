@@ -160,10 +160,12 @@ func getLogFile(filePath string) *os.File {
 
 		fullPath = filepath.Dir(filepath.Dir(filepath.Dir(ex))) + "/" + filePath
 	}
-	if err := os.MkdirAll(path.Dir(path.Clean(fullPath)), 0666); err != nil {
+
+	if err := os.MkdirAll(path.Dir(path.Clean(fullPath)), 0750); err != nil {
 		log.Panicln(err)
 	}
-	auditFile, err := os.OpenFile(fullPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+
+	auditFile, err := os.OpenFile(path.Clean(fullPath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		log.Panicln(err)
 	}

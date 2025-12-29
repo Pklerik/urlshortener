@@ -88,11 +88,10 @@ func BenchmarkBaseLinkService_RegisterLinks_Parallel(b *testing.B) {
 
 func TestNewLinksService(t *testing.T) {
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
 		repo      repository.LinksRepository
-		secretKey string
 		want      *BaseLinkService
+		name      string
+		secretKey string
 	}{
 		{name: "inmemservice", secretKey: "secret", repo: inmemory.NewInMemoryLinksRepository(), want: &BaseLinkService{}},
 	}

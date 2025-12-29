@@ -26,6 +26,7 @@ func (p *Pool[T]) Get() *T {
 	if item != nil {
 		return item.(*T)
 	}
+
 	return new(T)
 }
 
