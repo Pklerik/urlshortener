@@ -7,9 +7,9 @@ func (rs *TestStr) Reset() {
 	if rs == nil {
 		return
 	}
+	clear(rs.mapB)
 	rs.stringB = ""
+	rs.arrayB = rs.arrayB[:0]
 	rs.intB = 0
 	rs.floatB = 0
-	rs.arrayB = rs.arrayB[:0]
-	clear(rs.mapB)
 }
