@@ -62,6 +62,8 @@ func parseFlags() *config.StartupFlags {
 	flag.StringVar(&parsedArgs.Audit.LogURLPath, "audit_url", "", "URL path for audit log")
 	flag.BoolVar(&parsedArgs.TLS, "s", false, "use tls Listener ")
 	flag.StringVar(&parsedArgs.FileConfig, "c", "", "path to config json file")
+	flag.StringVar(&parsedArgs.FileConfig, "config", "", "path to config json file")
+	flag.StringVar(&parsedArgs.TrustedSubnet, "t", "", "CIDR notation of trusted subnet for internal endpoints access")
 	flag.Parse()
 
 	return parsedArgs

@@ -79,6 +79,21 @@ func (mr *MockLinksRepositoryMockRecorder) FindShort(ctx, short interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindShort", reflect.TypeOf((*MockLinksRepository)(nil).FindShort), ctx, short)
 }
 
+// GetStats mocks base method.
+func (m *MockLinksRepository) GetStats(ctx context.Context) (model.Stats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", ctx)
+	ret0, _ := ret[0].(model.Stats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockLinksRepositoryMockRecorder) GetStats(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockLinksRepository)(nil).GetStats), ctx)
+}
+
 // PingDB mocks base method.
 func (m *MockLinksRepository) PingDB(ctx context.Context) error {
 	m.ctrl.T.Helper()

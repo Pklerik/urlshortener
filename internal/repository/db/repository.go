@@ -388,3 +388,22 @@ func proceedBatch(ctx context.Context, db *sql.DB, ids []model.UUIDv7) (int, err
 
 	return len(deletedIDs), err
 }
+
+// GetStats returns stats from DB.
+func (r *LinksRepositoryPostgres) GetStats(ctx context.Context) (model.Stats, error) {
+	var stats model.Stats
+
+	row := r.db.QueryRowContext(ctx, "SELECT COUNT(*) AS total_urls FROM links WHERE is_deleted = false;")
+	err := row.Scan(&stats.LinksCount)
+	if err != nil {
+		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
+	}
+
+	row = r.db.QueryRowContext(ctx, "SELECT COUNT(*) AS total_users FROM users;")
+	err = row.Scan(&stats.UsersCount)
+	if err != nil {
+		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
+	}
+
+	return stats, nil
+}

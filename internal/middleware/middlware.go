@@ -5,10 +5,12 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
 )
 
@@ -185,4 +187,35 @@ func (c *compressReader) Close() error {
 		return err //nolint
 	}
 	return c.zr.Close() // nolint
+}
+
+func TrustedSubnetMiddleware(parsedFlags config.StartupFlagsParser) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+
+			v := parsedFlags.GetTrustedCIDR()
+			if v == "" {
+				logger.Sugar.Warn("no authorized IPs was provided")
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			_, trustedIPNet, err := net.ParseCIDR(v)
+			if err != nil {
+				logger.Sugar.Errorf("unable to parse trusted CIDR: %w", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+			ip := net.ParseIP(r.Header.Get("X-Real-IP"))
+			if !trustedIPNet.Contains(net.IP(ip)) {
+				logger.Sugar.Warnf("unauthorized access attempt from IP: %s", ip)
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}
+
+		return http.HandlerFunc(fn)
+	}
 }
