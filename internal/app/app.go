@@ -3,15 +3,18 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 
 	//nolint необходимо получать SIGTERM для остановки процесса.
 	"syscall"
 
 	"github.com/Pklerik/urlshortener/internal/config"
+	"github.com/Pklerik/urlshortener/internal/criptography"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/router"
 	"golang.org/x/sync/errgroup"
@@ -23,7 +26,7 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	go func() {
 		c := make(chan os.Signal, 1) // we need to reserve to buffer size 1, so the notifier are not blocked
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 
 		<-c
 		cancel()
@@ -47,7 +50,12 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
+		if parsedArgs.GetTLS() {
+			return runTLSListener(httpServer)
+		}
+
 		logger.Sugar.Infof("Starting server")
+
 		return httpServer.ListenAndServe()
 	})
 	g.Go(func() error {
@@ -60,4 +68,24 @@ func StartApp(parsedArgs config.StartupFlagsParser) {
 	if err := g.Wait(); err != nil {
 		logger.Sugar.Infof("exit reason: %s \n", err)
 	}
+}
+
+func runTLSListener(httpServer *http.Server) error {
+	// Сохраняем сертификат и приватный ключ в файлы ../../../cert/cert.pem и ../../../cert/private.pem
+	certPath, err := os.Executable()
+	if err != nil {
+		logger.Sugar.Errorf("unable o start server %v", err)
+		return fmt.Errorf("unable o start server %w", err)
+	}
+
+	certPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(certPath))), "cert")
+
+	keys, err := criptography.GetSertKey(certPath)
+	if err != nil {
+		logger.Sugar.Errorf("unable to generate cert sequence err: %v", err)
+	}
+
+	logger.Sugar.Infof("Starting server with TLS")
+
+	return fmt.Errorf("unable to start server with TLS: %w", httpServer.ListenAndServeTLS(keys.CertPEMFile, keys.PrivateKeyPEMFile))
 }

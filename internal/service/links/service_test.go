@@ -24,10 +24,10 @@ func TestBaseLinkService_RegisterLinks(t *testing.T) {
 		longURLs []string
 	}
 	tests := []struct {
-		name    string
 		fields  fields
-		args    args
+		name    string
 		want    string
+		args    args
 		wantErr bool
 	}{
 		{name: "Base", fields: fields{linksRepo: inmemory.NewInMemoryLinksRepository()}, args: args{ctx: context.Background(), longURLs: []string{"http://ya.ru"}}, want: "398f0ca4", wantErr: false},
@@ -84,4 +84,24 @@ func BenchmarkBaseLinkService_RegisterLinks_Parallel(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestNewLinksService(t *testing.T) {
+	tests := []struct {
+		repo      repository.LinksRepository
+		want      *BaseLinkService
+		name      string
+		secretKey string
+	}{
+		{name: "inmemservice", secretKey: "secret", repo: inmemory.NewInMemoryLinksRepository(), want: &BaseLinkService{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NewLinksService(tt.repo, tt.secretKey)
+			// TODO: update the condition below to compare got with tt.want.
+			if got == nil {
+				t.Errorf("NewLinksService() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

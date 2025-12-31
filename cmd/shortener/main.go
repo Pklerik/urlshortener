@@ -8,6 +8,12 @@ import (
 	"github.com/Pklerik/urlshortener/internal/logger"
 )
 
+const na = "N/A"
+
+var buildVersion string
+var buildDate string
+var buildCommit string
+
 func main() {
 	parsedArgs := parseArgs()
 
@@ -15,6 +21,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to setup logger: main: %s", err.Error())
 	}
+
+	if buildVersion == "" {
+		buildVersion = na
+	}
+
+	if buildDate == "" {
+		buildDate = na
+	}
+
+	if buildCommit == "" {
+		buildCommit = na
+	}
+
+	logger.Sugar.Infof("Build version: <%s>", buildVersion)
+	logger.Sugar.Infof("Build date: <%s>", buildDate)
+	logger.Sugar.Infof("Build commit: <%s>", buildCommit)
 
 	app.StartApp(parsedArgs)
 }

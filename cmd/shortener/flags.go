@@ -3,10 +3,17 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
+	"path/filepath"
+	"reflect" // nolint:depguard // used for dynamic field access
+	"strings"
+
+	"github.com/goccy/go-json"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/config/audit"
 	"github.com/Pklerik/urlshortener/internal/config/dbconf"
+	"github.com/Pklerik/urlshortener/internal/dictionary"
 	"github.com/caarlos0/env/v11"
 )
 
@@ -14,32 +21,26 @@ func parseArgs() config.StartupFlagsParser {
 	parsedArgs := parseFlags()
 	envArgs := parseEnvs()
 
-	if envArgs.ServerAddress != nil {
-		parsedArgs.ServerAddress = envArgs.ServerAddress
+	if envArgs.FileConfig != "" {
+		parsedArgs.FileConfig = envArgs.FileConfig
 	}
 
-	if envArgs.BaseURL != "" {
-		parsedArgs.BaseURL = envArgs.BaseURL
-	}
+	configArgs := parseConfig(parsedArgs.FileConfig)
 
-	if envArgs.LocalStorage != "" {
-		parsedArgs.LocalStorage = envArgs.LocalStorage
-	}
-
-	if envArgs.DBConf != nil {
-		parsedArgs.DBConf = envArgs.DBConf
-	}
-
-	if envArgs.SecretKey != "" {
-		parsedArgs.SecretKey = envArgs.SecretKey
-	}
-
-	if envArgs.Audit.LogFilePath != "" {
-		parsedArgs.Audit.LogFilePath = envArgs.Audit.LogFilePath
-	}
-
-	if envArgs.Audit.LogURLPath != "" {
-		parsedArgs.Audit.LogURLPath = envArgs.Audit.LogURLPath
+	for field := range reflect.TypeOf(envArgs).Elem().NumField() {
+		// check if env variable is set
+		v := reflect.ValueOf(envArgs).Elem().Field(field)
+		if !v.IsZero() {
+			// replaces parsedArgs field with env variable
+			reflect.ValueOf(parsedArgs).Elem().Field(field).Set(v)
+		} else {
+			// check if  parsedArgs variable is set
+			v := reflect.ValueOf(parsedArgs).Elem().Field(field)
+			if v.IsZero() {
+				// replaces parsedArgs field with configArgs variable
+				v.Set(reflect.ValueOf(configArgs).Elem().Field(field))
+			}
+		}
 	}
 
 	return parsedArgs
@@ -59,6 +60,8 @@ func parseFlags() *config.StartupFlags {
 	flag.StringVar(&parsedArgs.SecretKey, "secret_key", "secret_key", "Secret key for crypto")
 	flag.StringVar(&parsedArgs.Audit.LogFilePath, "audit_file", "", "File path for audit log")
 	flag.StringVar(&parsedArgs.Audit.LogURLPath, "audit_url", "", "URL path for audit log")
+	flag.BoolVar(&parsedArgs.TLS, "s", false, "use tls Listener ")
+	flag.StringVar(&parsedArgs.FileConfig, "c", "", "path to config json file")
 	flag.Parse()
 
 	return parsedArgs
@@ -74,4 +77,26 @@ func parseEnvs() *config.StartupFlags {
 	}
 
 	return envArgs
+}
+
+func parseConfig(fileConfig string) *config.StartupFlags {
+	configArgs := new(config.StartupFlags)
+
+	fullPath := fileConfig
+	if !strings.HasPrefix(fileConfig, "/") {
+		fullPath = filepath.Clean(filepath.Join(dictionary.BasePath, fileConfig))
+	}
+
+	if fileConfig != "" {
+		data, err := os.ReadFile(filepath.Clean(fullPath))
+		if err != nil {
+			return configArgs
+		}
+
+		if err := json.Unmarshal(data, configArgs); err != nil {
+			return configArgs
+		}
+	}
+
+	return configArgs
 }

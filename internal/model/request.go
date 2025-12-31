@@ -18,6 +18,7 @@ type RequestTextPlainHandler interface {
 }
 
 // Request provide request for shortener.
+// generate:reset
 type Request struct {
 	URL string `json:"url"`
 }
@@ -33,12 +34,14 @@ func (req *Request) SetBody(body string) {
 }
 
 // ReqPostBatch provide batch contract.
+// generate:reset
 type ReqPostBatch struct {
 	CorrelationID string `json:"correlation_id"`
 	LongURL       string `json:"original_url"`
 }
 
 // SlReqPostBatch provide slice of batch requests.
+// generate:reset
 type SlReqPostBatch []ReqPostBatch
 
 // String (reqSl *SlReqPostBatch) returns string representation of interface realization.
@@ -52,6 +55,7 @@ func (reqSl *SlReqPostBatch) String() string {
 }
 
 // ShortUrls contain slice of short urls.
+// generate:reset
 type ShortUrls []string
 
 // String() returns string representation of interface realization.

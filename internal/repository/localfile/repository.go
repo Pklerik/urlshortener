@@ -25,8 +25,8 @@ type LinksRepositoryFile struct {
 
 // FullData - all service data.
 type FullData struct {
-	Links []model.LinkData            `json:"links"`
 	Users map[model.UserID]model.User `json:"users"`
+	Links []model.LinkData            `json:"links"`
 }
 
 // NewLocalMemoryLinksRepository - provide new instance LocalMemoryLinksRepository
@@ -44,7 +44,7 @@ func NewLocalMemoryLinksRepository(filePath string) *LinksRepositoryFile {
 
 	logger.Sugar.Info("Set full path: ", fullPath)
 
-	_, err := os.OpenFile(fullPath, os.O_RDONLY|os.O_CREATE, 0644)
+	_, err := os.OpenFile(filepath.Clean(fullPath), os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
 		logger.Sugar.Fatalf("error creating storage file:%v : %w", fullPath, err)
 	}

@@ -6,12 +6,14 @@ import (
 )
 
 // UUIDv7 is a custom type that embeds uuidv7.UUID.
+// generate:reset
 type UUIDv7 string
 
 // UserID is a custom type for user id.
 type UserID UUIDv7
 
 // LinkData provide structure for URLs storage.
+// generate:reset
 type LinkData struct {
 	UUID      UUIDv7 `json:"uuid" db:"uuid"`
 	ShortURL  string `json:"short_url" db:"short_url"`
