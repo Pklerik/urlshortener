@@ -71,6 +71,12 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 					r.Get("/urls", linksHandler.GetUserLinks)
 					r.Delete("/urls", linksHandler.DeleteUserLinks)
 				})
+				r.Route("/internal", func(r chi.Router) {
+					r.Group(func(r chi.Router) {
+						r.Use(middleware.TrustedSubnetMiddleware(parsedFlags))
+						r.Get("/stats", linksHandler.GetStats)
+					})
+				})
 			})
 			r.Get("/ping", linksHandler.PingDB)
 		})

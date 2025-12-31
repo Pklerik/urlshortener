@@ -253,3 +253,12 @@ func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
 		return "", false
 	}
 }
+
+func (ls *BaseLinkService) GetStats(ctx context.Context) (model.Stats, error) {
+	stats, err := ls.repo.GetStats(ctx)
+	if err != nil {
+		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
+	}
+
+	return stats, nil
+}

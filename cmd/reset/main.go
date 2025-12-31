@@ -17,12 +17,7 @@ import (
 	"strings"
 	"syscall" //nolint needs to call sigterm for asinc program termination.
 
-	"github.com/samborkent/uuidv7"
 	"golang.org/x/sync/errgroup"
-)
-
-var (
-	fileCh = make(chan string, 100)
 )
 
 func main() {
@@ -38,6 +33,8 @@ func main() {
 		<-c
 		cancel()
 	}()
+
+	var fileCh = make(chan string, 100)
 
 	// Use errgroup to manage file processing goroutine
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -208,12 +205,8 @@ func (rs *` + names[i] + `) Reset() {
 }
 
 func primitiveStrVal(t *ast.Ident) string {
-	if t.Name == "string" {
+	if t.Name == "string" || t.Name == "UUIDv7" || t.Name == "UserID" {
 		return `""`
-	}
-
-	if t.Name == "UUIDv7" || t.Name == "UserID" {
-		return `"` + uuidv7.New().String() + `"`
 	}
 
 	if strings.Contains(t.Name, "float") || strings.Contains(t.Name, "int") {

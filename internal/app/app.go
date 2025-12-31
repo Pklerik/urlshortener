@@ -14,7 +14,7 @@ import (
 	"syscall"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/criptography"
+	"github.com/Pklerik/urlshortener/internal/cryptography"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/router"
 	"golang.org/x/sync/errgroup"
@@ -80,7 +80,7 @@ func runTLSListener(httpServer *http.Server) error {
 
 	certPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(certPath))), "cert")
 
-	keys, err := criptography.GetSertKey(certPath)
+	keys, err := cryptography.GetSertKey(certPath)
 	if err != nil {
 		logger.Sugar.Errorf("unable to generate cert sequence err: %v", err)
 	}

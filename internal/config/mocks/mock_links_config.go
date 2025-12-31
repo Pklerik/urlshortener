@@ -163,3 +163,17 @@ func (mr *MockStartupFlagsParserMockRecorder) GetTimeout() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTimeout", reflect.TypeOf((*MockStartupFlagsParser)(nil).GetTimeout))
 }
+
+// GetTrustedCIDR mocks base method.
+func (m *MockStartupFlagsParser) GetTrustedCIDR() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTrustedCIDR")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetTrustedCIDR indicates an expected call of GetTrustedCIDR.
+func (mr *MockStartupFlagsParserMockRecorder) GetTrustedCIDR() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTrustedCIDR", reflect.TypeOf((*MockStartupFlagsParser)(nil).GetTrustedCIDR))
+}

@@ -196,3 +196,22 @@ func (r *LinksRepositoryFile) CreateUser(_ context.Context, userID model.UserID)
 func (r *LinksRepositoryFile) BatchMarkAsDeleted(_ context.Context, _ chan model.LinkData) error {
 	return nil
 }
+
+// GetStats provides stats info.
+func (r *LinksRepositoryFile) GetStats(_ context.Context) (model.Stats, error) {
+	data, err := r.Read()
+	if err != nil {
+		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
+	}
+
+	var stats model.Stats
+
+	for _, linkData := range data.Links {
+		if !linkData.IsDeleted {
+			stats.LinksCount++
+		}
+	}
+	stats.UsersCount = int64(len(data.Users))
+
+	return stats, nil
+}
