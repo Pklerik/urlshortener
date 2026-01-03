@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/handler/validators"
+	"github.com/Pklerik/urlshortener/internal/handler/rest/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
 
 	"github.com/Pklerik/urlshortener/internal/model"

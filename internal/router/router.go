@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/handler"
+	grpcHandler "github.com/Pklerik/urlshortener/internal/handler/grpc/handler"
+	restHandler "github.com/Pklerik/urlshortener/internal/handler/rest"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/repository"
@@ -18,6 +19,8 @@ import (
 	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
 	chimiddleware "github.com/go-chi/chi/middleware"
+
+	"golang.org/x/net/http2/h2c"
 )
 
 // ConfigureRouter starts server with base configuration.
@@ -36,9 +39,11 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 
 	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
 
-	authHandler := handler.NewAuthenticationHandler(linksService)
-	linksHandler := handler.NewLinkHandler(linksService, authHandler, parsedFlags)
-	auditHandler := handler.NewAuditor(parsedFlags, authHandler)
+	authHandler := restHandler.NewAuthenticationHandler(linksService)
+	linksHandler := restHandler.NewLinkHandler(linksService, authHandler, parsedFlags)
+	auditHandler := restHandler.NewAuditor(parsedFlags, authHandler)
+
+	gh := grpcHandler.NewUsersLinksHandler(linksService)
 
 	// Add pprof routes
 	r.Mount("/debug", chimiddleware.Profiler())
@@ -82,9 +87,13 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		})
 	})
 
+	r.Handle("/api/shorten"+"*", gh)   // e.g., mounts to "/protoPackage.ServiceName/"
+	r.Handle("/{shortURL}"+"*", gh)    // e.g., mounts to "/protoPackage.ServiceName/"
+	r.Handle("/api/user/urls"+"*", gh) // e.g., mounts to "/protoPackage.ServiceName/"
+
 	printRoutes(r)
 
-	return r, nil
+	return h2c.NewHandler(r, nil), nil
 }
 
 // Use chi.Walk to print all routes.

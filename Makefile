@@ -60,3 +60,9 @@ mock:
 	mockgen -source=internal/repository/repository.go -destination=internal/repository/mocks/mock_links_repo.go -package=mocks
 	mockgen -source=internal/service/service.go -destination=internal/service/mocks/mock_links_service.go -package=mocks
 	mockgen -source=internal/config/config.go -destination=internal/config/mocks/mock_links_config.go -package=mocks
+
+protogen:
+	protoc --go_out=. --go-grpc_out=. \
+	--go-grpc_opt=paths=source_relative --go_opt=paths=source_relative \
+	--go_opt=default_api_level=API_OPAQUE \
+	./api/proto/shortener.proto

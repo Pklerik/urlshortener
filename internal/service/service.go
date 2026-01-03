@@ -14,6 +14,8 @@ var (
 	ErrEmptyLongURL = errors.New("ShortURL is empty")
 	// ErrCollision - sets error if shortURL existed for different long.
 	ErrCollision = errors.New("collision for url in db")
+	// ErrEmptySecret - secret not found.
+	ErrEmptySecret = errors.New("empty secret")
 )
 
 // LinkServicer provide service contract for link handling.
