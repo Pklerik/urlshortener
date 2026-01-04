@@ -60,6 +60,7 @@ func (lsu *LongShortURLs) String() string {
 	return fmt.Sprint("[", res, "]")
 }
 
+// Stats provide service statistics.
 type Stats struct {
 	LinksCount int64 `json:"links_count"`
 	UsersCount int64 `json:"users_count"`

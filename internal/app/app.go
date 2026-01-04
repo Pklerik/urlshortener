@@ -15,9 +15,9 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/cryptography"
+	"github.com/Pklerik/urlshortener/internal/router"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
-	"github.com/Pklerik/urlshortener/internal/router"
 	"golang.org/x/sync/errgroup"
 )
 

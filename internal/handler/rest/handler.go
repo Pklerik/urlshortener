@@ -342,6 +342,7 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
 }
 
+// GetStats handler for service statistics.
 func (lh *LinkHandle) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := lh.service.GetStats(r.Context())
 	if err != nil {

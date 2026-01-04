@@ -232,5 +232,6 @@ func writeGenerated(buf *bytes.Buffer, path string) error {
 	if err != nil {
 		return fmt.Errorf("writeGenerated: %w", err)
 	}
+
 	return nil
 }

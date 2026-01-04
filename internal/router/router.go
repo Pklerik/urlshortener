@@ -19,6 +19,7 @@ import (
 	"github.com/Pklerik/urlshortener/internal/service/links"
 	"github.com/go-chi/chi"
 	chimiddleware "github.com/go-chi/chi/middleware"
+	"google.golang.org/grpc"
 
 	"golang.org/x/net/http2/h2c"
 )
@@ -42,9 +43,24 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	authHandler := restHandler.NewAuthenticationHandler(linksService)
 	linksHandler := restHandler.NewLinkHandler(linksService, authHandler, parsedFlags)
 	auditHandler := restHandler.NewAuditor(parsedFlags, authHandler)
+	gh, err := grpcHandler.NewUsersLinksHandler(ctx, linksService)
+	if err != nil {
+		return nil, fmt.Errorf("unable to start gRPC Server: %w", err)
+	}
+	r = addRESTRoutes(r, parsedFlags, authHandler, auditHandler, linksHandler, gh.(*grpc.Server))
 
-	gh := grpcHandler.NewUsersLinksHandler(linksService)
+	// r = addGRPCRoutes(r, gh)
 
+	printRoutes(r)
+
+	// return http2 supported handler for gRPC realization inside chi routing.
+	return h2c.NewHandler(r, nil), nil
+}
+
+func addRESTRoutes(r *chi.Mux, parsedFlags config.StartupFlagsParser,
+	authHandler *restHandler.AuthHandler, auditHandler *restHandler.Auditor,
+	linksHandler restHandler.LinkHandler, gh *grpc.Server) *chi.Mux {
+	r.Use(middleware.GRPCMuxMiddleware(gh))
 	// Add pprof routes
 	r.Mount("/debug", chimiddleware.Profiler())
 
@@ -53,7 +69,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 			chimiddleware.RequestID,
 			chimiddleware.RealIP,
 			chimiddleware.Logger,
-			chimiddleware.Recoverer,
+			// chimiddleware.Recoverer,
 			middleware.GZIPMiddleware,
 			authHandler.AuthUser,
 			chimiddleware.Timeout(parsedFlags.GetTimeout()),
@@ -87,13 +103,15 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 		})
 	})
 
-	r.Handle("/api/shorten"+"*", gh)   // e.g., mounts to "/protoPackage.ServiceName/"
-	r.Handle("/{shortURL}"+"*", gh)    // e.g., mounts to "/protoPackage.ServiceName/"
-	r.Handle("/api/user/urls"+"*", gh) // e.g., mounts to "/protoPackage.ServiceName/"
+	return r
+}
 
-	printRoutes(r)
+func addGRPCRoutes(r *chi.Mux, grpcHandler http.Handler) *chi.Mux {
+	r.Handle("/api/shorten"+"*", grpcHandler)
+	r.Handle("/{shortURL}"+"*", grpcHandler)
+	r.Handle("/api/user/urls"+"*", grpcHandler)
 
-	return h2c.NewHandler(r, nil), nil
+	return r
 }
 
 // Use chi.Walk to print all routes.

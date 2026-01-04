@@ -12,6 +12,7 @@ import (
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"google.golang.org/grpc"
 )
 
 type (
@@ -189,14 +190,15 @@ func (c *compressReader) Close() error {
 	return c.zr.Close() // nolint
 }
 
+// TrustedSubnetMiddleware trusted subnet limiter.
 func TrustedSubnetMiddleware(parsedFlags config.StartupFlagsParser) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-
 			v := parsedFlags.GetTrustedCIDR()
 			if v == "" {
 				logger.Sugar.Warn("no authorized IPs was provided")
 				http.Error(w, "Forbidden", http.StatusForbidden)
+
 				return
 			}
 
@@ -204,12 +206,15 @@ func TrustedSubnetMiddleware(parsedFlags config.StartupFlagsParser) func(http.Ha
 			if err != nil {
 				logger.Sugar.Errorf("unable to parse trusted CIDR: %w", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+
 				return
 			}
+
 			ip := net.ParseIP(r.Header.Get("X-Real-IP"))
-			if !trustedIPNet.Contains(net.IP(ip)) {
+			if !trustedIPNet.Contains(ip) {
 				logger.Sugar.Warnf("unauthorized access attempt from IP: %s", ip)
 				http.Error(w, "Forbidden", http.StatusForbidden)
+
 				return
 			}
 
@@ -218,4 +223,20 @@ func TrustedSubnetMiddleware(parsedFlags config.StartupFlagsParser) func(http.Ha
 
 		return http.HandlerFunc(fn)
 	}
+}
+
+// GRPCMuxMiddleware - reroute to one of realization type.
+func GRPCMuxMiddleware(grpcServer *grpc.Server) func(next http.Handler) http.Handler {
+	fn := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if the request is gRPC based on Content-Type and HTTP/2
+			if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+				grpcServer.ServeHTTP(w, r)
+				return
+			}
+			// Fall back to standard Chi REST routing
+			next.ServeHTTP(w, r)
+		})
+	}
+	return fn
 }
