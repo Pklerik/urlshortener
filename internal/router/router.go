@@ -47,9 +47,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	if err != nil {
 		return nil, fmt.Errorf("unable to start gRPC Server: %w", err)
 	}
-	r = addRESTRoutes(r, parsedFlags, authHandler, auditHandler, linksHandler, gh.(*grpc.Server))
-
-	// r = addGRPCRoutes(r, gh)
+	r = addRESTRoutes(r, parsedFlags, authHandler, auditHandler, linksHandler, gh)
 
 	printRoutes(r)
 
@@ -102,14 +100,6 @@ func addRESTRoutes(r *chi.Mux, parsedFlags config.StartupFlagsParser,
 			r.Get("/ping", linksHandler.PingDB)
 		})
 	})
-
-	return r
-}
-
-func addGRPCRoutes(r *chi.Mux, grpcHandler http.Handler) *chi.Mux {
-	r.Handle("/api/shorten"+"*", grpcHandler)
-	r.Handle("/{shortURL}"+"*", grpcHandler)
-	r.Handle("/api/user/urls"+"*", grpcHandler)
 
 	return r
 }

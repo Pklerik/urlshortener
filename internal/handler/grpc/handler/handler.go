@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 
 	pb "github.com/Pklerik/urlshortener/api/proto"
 	"github.com/Pklerik/urlshortener/internal/interceptor"
@@ -39,7 +38,7 @@ type UsersLinksHandler struct {
 var _ pb.ShortenerServiceServer = (*UsersLinksHandler)(nil)
 
 // NewUsersLinksHandler - provide gRPC Handlers for Links Service.
-func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) (http.Handler, error) {
+func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) (*grpc.Server, error) {
 	ulh := &UsersLinksHandler{service: svc}
 
 	secret, ok := svc.GetSecret("SECRET_KEY")
