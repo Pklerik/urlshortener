@@ -136,8 +136,8 @@ func (ac *AuditClient) Write(massage []byte) (int, error) {
 	resp, err := ac.client.GetClient().Post(ac.auditConf.GetLogURLPath(), "application-json", buf)
 	if err != nil {
 		Sugar.Errorf("Error sending audit by URL: <%s>: %v", ac.auditConf.GetLogURLPath(), err)
+		return 0, fmt.Errorf("unable to send audit log")
 	}
-
 	err = resp.Body.Close()
 	if err != nil {
 		Sugar.Errorf("Error closing response body: %v", err)

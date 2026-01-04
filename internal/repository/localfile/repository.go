@@ -211,6 +211,7 @@ func (r *LinksRepositoryFile) GetStats(_ context.Context) (model.Stats, error) {
 			stats.LinksCount++
 		}
 	}
+
 	stats.UsersCount = int64(len(data.Users))
 
 	return stats, nil

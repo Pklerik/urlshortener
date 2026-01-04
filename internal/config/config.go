@@ -39,9 +39,9 @@ type StartupFlags struct {
 	LocalStorage  string       `json:"local_storage_path" env:"FILE_STORAGE_PATH"`
 	SecretKey     string       `json:"secret_key" env:"SECRET_KEY"`
 	FileConfig    string       `env:"CONFIG"`
+	TrustedSubnet string       `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 	Timeout       float64      `json:"timeout" env:"SERVER_TIMEOUT"`
 	TLS           bool         `json:"enable_https" env:"ENABLE_HTTPS"`
-	TrustedSubnet string       `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 }
 
 var _ StartupFlagsParser = (*StartupFlags)(nil)
@@ -255,6 +255,7 @@ func (sf *StartupFlags) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// GetTrustedCIDR provide CIDR from configs.
 func (sf *StartupFlags) GetTrustedCIDR() string {
 	return sf.TrustedSubnet
 }

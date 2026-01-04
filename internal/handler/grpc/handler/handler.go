@@ -1,3 +1,4 @@
+// Package handler provide gRPC handler service realization.
 package handler
 
 import (
@@ -7,13 +8,13 @@ import (
 	"net/http"
 
 	pb "github.com/Pklerik/urlshortener/api/proto"
+	"github.com/Pklerik/urlshortener/internal/interceptor"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
 	"github.com/gogo/protobuf/proto"
-	"github.com/samborkent/uuidv7"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -34,68 +35,25 @@ type UsersLinksHandler struct {
 	service service.LinkServicer
 }
 
-// Проверка того, что UsersServer реализует интерфейс pb.ShortenerServiceServer.
+// Проверка того, что UsersLinksHandler реализует интерфейс pb.ShortenerServiceServer.
 var _ pb.ShortenerServiceServer = (*UsersLinksHandler)(nil)
 
-func NewUsersLinksHandler(svc service.LinkServicer) http.Handler {
+// NewUsersLinksHandler - provide gRPC Handlers for Links Service.
+func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) (http.Handler, error) {
 	ulh := &UsersLinksHandler{service: svc}
-	s := grpc.NewServer(grpc.UnaryInterceptor(ulh.AuthHandle))
-	pb.RegisterShortenerServiceServer(s, &UsersLinksHandler{service: svc})
-	return s
+
+	secret, ok := svc.GetSecret("SECRET_KEY")
+	if !ok {
+		return nil, service.ErrEmptySecret
+	}
+
+	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor.AuthUnaryServerInterceptor(secret.(string))))
+	pb.RegisterShortenerServiceServer(s, ulh)
+
+	return s, nil
 }
 
-func (us *UsersLinksHandler) AuthHandle(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-	err := us.authUser(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("auth error: %w", err)
-	}
-	resp, err := handler(ctx, req)
-	if err != nil {
-		logger.Sugar.Errorf("AuthHandle %s,%v", info.FullMethod, err)
-	} else {
-		logger.Sugar.Infof("Auth User %s SUCCESS", info.FullMethod)
-	}
-	return resp, err
-
-}
-
-func (us *UsersLinksHandler) authUser(ctx context.Context) error {
-	// Получаем ID пользователя из контекста
-	var (
-		jwtToken string
-		err      error
-	)
-
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		values := md.Get("authorization")
-		if len(values) > 0 {
-			// ключ содержит слайс строк, получаем первую строку
-			jwtToken = values[0]
-		}
-	}
-	if jwtToken == "" {
-		secret, ok := us.service.GetSecret("SECRET_KEY")
-		if !ok {
-			return service.ErrEmptySecret
-		}
-		jwtToken, err = jwtgenerator.BuildJWTString(uuidv7.New(), secret.(string))
-		if err != nil {
-			return fmt.Errorf("unable to getUserID: %w", err)
-		}
-	}
-
-	headerMd := metadata.Pairs(
-		"authorization", jwtToken,
-	)
-	if err := grpc.SendHeader(ctx, headerMd); err != nil {
-		logger.Sugar.Warnf("could not send header: %v", err)
-		// Handle error appropriately
-	}
-
-	return nil
-}
-
+// GetUserID return userID provided from JWT token form context.
 func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error) {
 	// Получаем ID пользователя из контекста
 	var (
@@ -107,7 +65,6 @@ func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return userID, ErrUnauthorizedUser
-
 	}
 
 	values := md.Get("authorization")
@@ -117,6 +74,7 @@ func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error
 	}
 	// ключ содержит слайс строк, получаем первую строку
 	jwtToken = values[0]
+
 	secret, ok := us.service.GetSecret("SECRET_KEY")
 	if !ok {
 		return userID, service.ErrEmptySecret
@@ -136,13 +94,14 @@ func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error
 func (us *UsersLinksHandler) ExpandURL(ctx context.Context, req *pb.URLExpandRequest) (*pb.URLExpandResponse, error) {
 	link, err := us.service.GetShort(ctx, req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ExpandURL: %w", err)
 	}
+
 	response := pb.URLExpandResponse_builder{
 		Result: proto.String(link.LongURL),
 	}.Build()
-	return response, nil
 
+	return response, nil
 }
 
 // ShortenURL реализует метод сокращения URL.
@@ -152,11 +111,13 @@ func (us *UsersLinksHandler) ShortenURL(ctx context.Context, req *pb.URLShortenR
 	if err != nil {
 		return &pb.URLShortenResponse{}, fmt.Errorf("ShortenURL: %w", err)
 	}
+
 	links, err := us.service.RegisterLinks(ctx, []string{req.GetUrl()}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Errorf("grpc ShortenURL error: %v", err)
 		return nil, fmt.Errorf("ShortenURL: %w", err)
 	}
+
 	if len(links) == 0 {
 		return &pb.URLShortenResponse{}, nil
 	}
@@ -168,15 +129,17 @@ func (us *UsersLinksHandler) ShortenURL(ctx context.Context, req *pb.URLShortenR
 	return response, nil
 }
 
+// ListUserURLs provide service statistics.
 func (us *UsersLinksHandler) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*pb.UserURLsResponse, error) {
 	// Реализация метода ListUserURLs
 	userID, err := us.GetUserID(ctx)
 	if err != nil {
 		return &pb.UserURLsResponse{}, fmt.Errorf("ListUserURLs: %w", err)
 	}
+
 	links, err := us.service.ProvideUserLinks(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ListUserURLs: %w", err)
 	}
 
 	response := pb.UserURLsResponse_builder{

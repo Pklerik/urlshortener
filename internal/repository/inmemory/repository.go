@@ -96,18 +96,19 @@ func (r *LinksRepositoryMemory) BatchMarkAsDeleted(_ context.Context, _ chan mod
 	return nil
 }
 
+// GetStats provide user stats info.
 func (r *LinksRepositoryMemory) GetStats(_ context.Context) (model.Stats, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var totalURLs int64
-	var totalUsers int64
+	var totalURLs, totalUsers int64
 
 	for _, linkData := range r.Shorts {
 		if !linkData.IsDeleted {
 			totalURLs++
 		}
 	}
+
 	totalUsers = int64(len(r.Users))
 
 	return model.Stats{

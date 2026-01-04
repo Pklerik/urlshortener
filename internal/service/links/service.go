@@ -254,6 +254,7 @@ func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
 	}
 }
 
+// GetStats - provide aggregated statistics about shortened links and users.
 func (ls *BaseLinkService) GetStats(ctx context.Context) (model.Stats, error) {
 	stats, err := ls.repo.GetStats(ctx)
 	if err != nil {

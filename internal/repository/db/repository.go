@@ -214,7 +214,7 @@ func (r *LinksRepositoryPostgres) FindShort(ctx context.Context, short string) (
 
 	ld, err = r.getShort(ctx, tx, short)
 	if err != nil {
-		return *ld, fmt.Errorf("crate error: %w", err)
+		return model.LinkData{}, fmt.Errorf("crate error: %w", err)
 	}
 
 	return *ld, nil
@@ -243,7 +243,7 @@ func (r *LinksRepositoryPostgres) getShort(ctx context.Context, tx *sql.Tx, shor
 			return nil, fmt.Errorf("error selecting db data: %w", err)
 		}
 
-		return nil, nil
+		return nil, fmt.Errorf("not found: %w: ", err)
 	}
 
 	logger.Sugar.Infof("LD selected: %s", linkData)
@@ -394,12 +394,14 @@ func (r *LinksRepositoryPostgres) GetStats(ctx context.Context) (model.Stats, er
 	var stats model.Stats
 
 	row := r.db.QueryRowContext(ctx, "SELECT COUNT(*) AS total_urls FROM links WHERE is_deleted = false;")
+
 	err := row.Scan(&stats.LinksCount)
 	if err != nil {
 		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
 	}
 
 	row = r.db.QueryRowContext(ctx, "SELECT COUNT(*) AS total_users FROM users;")
+
 	err = row.Scan(&stats.UsersCount)
 	if err != nil {
 		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
