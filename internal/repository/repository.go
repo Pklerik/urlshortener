@@ -30,4 +30,5 @@ type LinksRepository interface {
 	BatchMarkAsDeleted(ctx context.Context, links chan model.LinkData) error
 	CreateUser(ctx context.Context, userID model.UserID) (model.User, error)
 	PingDB(ctx context.Context) error
+	GetStats(ctx context.Context) (model.Stats, error)
 }

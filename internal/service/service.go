@@ -14,6 +14,8 @@ var (
 	ErrEmptyLongURL = errors.New("ShortURL is empty")
 	// ErrCollision - sets error if shortURL existed for different long.
 	ErrCollision = errors.New("collision for url in db")
+	// ErrEmptySecret - secret not found.
+	ErrEmptySecret = errors.New("empty secret")
 )
 
 // LinkServicer provide service contract for link handling.
@@ -23,5 +25,6 @@ type LinkServicer interface {
 	ProvideUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error)
 	MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) error
 	PingDB(ctx context.Context) error
-	GetSecret(name string) (any, bool)
+	GetSecret(name string) (string, bool)
+	GetStats(ctx context.Context) (model.Stats, error)
 }

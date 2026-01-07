@@ -59,3 +59,14 @@ func (lsu *LongShortURLs) String() string {
 
 	return fmt.Sprint("[", res, "]")
 }
+
+// Stats provide service statistics.
+type Stats struct {
+	LinksCount int64 `json:"links_count"`
+	UsersCount int64 `json:"users_count"`
+}
+
+// String (s *Stats) returns string representation of interface realization.
+func (s *Stats) String() string {
+	return fmt.Sprintf("Stats{LinksCount: %d, UsersCount: %d}", s.LinksCount, s.UsersCount)
+}

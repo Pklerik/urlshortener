@@ -3,6 +3,7 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -29,6 +30,9 @@ var (
 	config      zap.Config
 	auditLogger *zap.Logger
 	once        sync.Once
+
+	//ErrSendingAuditLog unable to send audit log.
+	ErrSendingAuditLog = errors.New("unable to send audit log")
 )
 
 // Initialize инициализирует синглтон логера с необходимым уровнем логирования.
@@ -136,6 +140,7 @@ func (ac *AuditClient) Write(massage []byte) (int, error) {
 	resp, err := ac.client.GetClient().Post(ac.auditConf.GetLogURLPath(), "application-json", buf)
 	if err != nil {
 		Sugar.Errorf("Error sending audit by URL: <%s>: %v", ac.auditConf.GetLogURLPath(), err)
+		return 0, ErrSendingAuditLog
 	}
 
 	err = resp.Body.Close()

@@ -5,11 +5,13 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
+	"google.golang.org/grpc"
 )
 
 type (
@@ -185,4 +187,40 @@ func (c *compressReader) Close() error {
 		return err //nolint
 	}
 	return c.zr.Close() // nolint
+}
+
+// TrustedSubnetMiddleware trusted subnet limiter.
+func TrustedSubnetMiddleware(trustedIPNet *net.IPNet) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			ip := net.ParseIP(r.Header.Get("X-Real-IP"))
+			if !trustedIPNet.Contains(ip) {
+				logger.Sugar.Warnf("unauthorized access attempt from IP: %s", ip)
+				http.Error(w, "Forbidden", http.StatusForbidden)
+
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}
+
+		return http.HandlerFunc(fn)
+	}
+}
+
+// GRPCMuxMiddleware - reroute to one of realization type.
+func GRPCMuxMiddleware(grpcServer *grpc.Server) func(next http.Handler) http.Handler {
+	fn := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if the request is gRPC based on Content-Type and HTTP/2
+			if r.ProtoMajor == 2 && strings.HasPrefix(r.Header.Get("Content-Type"), "application/grpc") {
+				grpcServer.ServeHTTP(w, r)
+				return
+			}
+			// Fall back to standard Chi REST routing
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	return fn
 }

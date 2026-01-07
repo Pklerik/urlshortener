@@ -34,10 +34,11 @@ func TestRegisterLinkHandler(t *testing.T) {
 	testJSONResp := "\"result\""
 
 	r, err := ConfigureRouter(context.TODO(), &config.StartupFlags{
-		BaseURL:      redirectHost,
-		LocalStorage: "../../local_storage.json",
-		DBConf:       nil,
-		Timeout:      10000,
+		BaseURL:       redirectHost,
+		LocalStorage:  "../../local_storage.json",
+		DBConf:        nil,
+		Timeout:       10000,
+		TrustedSubnet: "127.0.0.1/8",
 	})
 	assert.NoError(t, err, "error setup router")
 
@@ -275,8 +276,9 @@ func BenchmarkShortenerService(b *testing.B) {
 				Protocol: "http",
 				Host:     "localhost",
 				Port:     16082},
-			BaseURL: "http://test_host:2345",
-			Timeout: 10000,
+			BaseURL:       "http://test_host:2345",
+			Timeout:       10000,
+			TrustedSubnet: "127.0.0.1/8",
 		})
 		assert.NoError(b, err, "error setup router")
 		srv := httptest.NewServer(r)

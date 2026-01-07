@@ -245,11 +245,21 @@ func funInDeletionLinks(ctx context.Context, resultChs ...chan model.LinkData) c
 }
 
 // GetSecret provide secret key from service.
-func (ls *BaseLinkService) GetSecret(name string) (any, bool) {
+func (ls *BaseLinkService) GetSecret(name string) (string, bool) {
 	switch name {
 	case "SECRET_KEY":
 		return ls.secretKey, true
 	default:
 		return "", false
 	}
+}
+
+// GetStats - provide aggregated statistics about shortened links and users.
+func (ls *BaseLinkService) GetStats(ctx context.Context) (model.Stats, error) {
+	stats, err := ls.repo.GetStats(ctx)
+	if err != nil {
+		return model.Stats{}, fmt.Errorf("GetStats: %w", err)
+	}
+
+	return stats, nil
 }

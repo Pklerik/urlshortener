@@ -26,6 +26,7 @@ type StartupFlagsParser interface {
 	GetSecretKey() string
 	GetAudit() *audit.Audit
 	GetTLS() bool
+	GetTrustedCIDR() string
 }
 
 // StartupFlags app startup flags.
@@ -38,9 +39,12 @@ type StartupFlags struct {
 	LocalStorage  string       `json:"local_storage_path" env:"FILE_STORAGE_PATH"`
 	SecretKey     string       `json:"secret_key" env:"SECRET_KEY"`
 	FileConfig    string       `env:"CONFIG"`
+	TrustedSubnet string       `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 	Timeout       float64      `json:"timeout" env:"SERVER_TIMEOUT"`
 	TLS           bool         `json:"enable_https" env:"ENABLE_HTTPS"`
 }
+
+var _ StartupFlagsParser = (*StartupFlags)(nil)
 
 // GetServerAddress returns ServerAddress.
 func (sf *StartupFlags) GetServerAddress() Address {
@@ -241,8 +245,17 @@ func (sf *StartupFlags) UnmarshalJSON(data []byte) error {
 			if v, ok := value.(bool); ok {
 				sf.TLS = v
 			}
+		case "trusted_subnet":
+			if v, ok := value.(string); ok {
+				sf.TrustedSubnet = v
+			}
 		}
 	}
 
 	return nil
+}
+
+// GetTrustedCIDR provide CIDR from configs.
+func (sf *StartupFlags) GetTrustedCIDR() string {
+	return sf.TrustedSubnet
 }

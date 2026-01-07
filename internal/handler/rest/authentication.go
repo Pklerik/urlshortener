@@ -53,7 +53,7 @@ func (ah *AuthHandler) AuthUser(next http.Handler) http.Handler {
 
 			validJWT, err := jwtgenerator.BuildJWTString(
 				uuidv7.New(),
-				secretKey.(string),
+				secretKey,
 			)
 			if err != nil {
 				http.Error(w, "Unable to generete JWT", http.StatusInternalServerError)
@@ -97,7 +97,7 @@ func (ah *AuthHandler) GetUserIDFromCookie(r *http.Request) (model.UserID, error
 		return model.UserID(uuidv7.New().String()), ErrUnauthorizedUser
 	}
 
-	userID, err := jwtgenerator.GetUserID(secretKey.(string), authCookie.Value)
+	userID, err := jwtgenerator.GetUserID(secretKey, authCookie.Value)
 	if err != nil {
 		logger.Sugar.Infof(`Unable to get UserID: status: %d`, http.StatusUnauthorized)
 

@@ -36,10 +36,10 @@ func (m *MockLinkServicer) EXPECT() *MockLinkServicerMockRecorder {
 }
 
 // GetSecret mocks base method.
-func (m *MockLinkServicer) GetSecret(name string) (any, bool) {
+func (m *MockLinkServicer) GetSecret(name string) (string, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSecret", name)
-	ret0, _ := ret[0].(any)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -63,6 +63,21 @@ func (m *MockLinkServicer) GetShort(ctx context.Context, shortURL string) (model
 func (mr *MockLinkServicerMockRecorder) GetShort(ctx, shortURL interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShort", reflect.TypeOf((*MockLinkServicer)(nil).GetShort), ctx, shortURL)
+}
+
+// GetStats mocks base method.
+func (m *MockLinkServicer) GetStats(ctx context.Context) (model.Stats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", ctx)
+	ret0, _ := ret[0].(model.Stats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockLinkServicerMockRecorder) GetStats(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockLinkServicer)(nil).GetStats), ctx)
 }
 
 // MarkAsDeleted mocks base method.

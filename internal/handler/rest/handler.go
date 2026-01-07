@@ -9,7 +9,7 @@ import (
 	"net/http"
 
 	"github.com/Pklerik/urlshortener/internal/config"
-	"github.com/Pklerik/urlshortener/internal/handler/validators"
+	"github.com/Pklerik/urlshortener/internal/handler/rest/validators"
 	"github.com/Pklerik/urlshortener/internal/logger"
 
 	"github.com/Pklerik/urlshortener/internal/model"
@@ -28,6 +28,7 @@ type LinkHandler interface {
 	PostBatchJSON(w http.ResponseWriter, r *http.Request)
 	GetUserLinks(w http.ResponseWriter, r *http.Request)
 	DeleteUserLinks(w http.ResponseWriter, r *http.Request)
+	GetStats(w http.ResponseWriter, r *http.Request)
 }
 
 // LinkHandle - wrapper for service handling.
@@ -339,4 +340,25 @@ func (lh *LinkHandle) DeleteUserLinks(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	logger.Sugar.Infof(`url: "%s" Accepted for deletion`, req)
+}
+
+// GetStats handler for service statistics.
+func (lh *LinkHandle) GetStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := lh.service.GetStats(r.Context())
+	if err != nil {
+		logger.Sugar.Infof(`Unable to get stats: status: %d`, http.StatusInternalServerError)
+		http.Error(w, `Unable to get stats`, http.StatusInternalServerError)
+
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := writeRes(w, &stats); err != nil {
+		logger.Log.Debug("error encoding response", zap.Error(err))
+		http.Error(w, `Unexpected exception: `, http.StatusInternalServerError)
+
+		return
+	}
 }

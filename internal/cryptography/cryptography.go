@@ -1,5 +1,5 @@
-// Package criptography provides functions for generating and managing TLS certificates and keys.
-package criptography
+// Package cryptography provides functions for generating and managing TLS certificates and keys.
+package cryptography
 
 import (
 	"bytes"
@@ -17,44 +17,21 @@ import (
 	"time"
 )
 
-var (
-	cert = &x509.Certificate{
-		// указываем уникальный номер сертификата
-		SerialNumber: big.NewInt(1658),
-		// заполняем базовую информацию о владельце сертификата
-		Subject: pkix.Name{
-			Organization: []string{"Pavel.Budkov"},
-			Country:      []string{"RU"},
-		},
-		// разрешаем использование сертификата для 127.0.0.1 и ::1
-		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-		// сертификат верен, начиная со времени создания
-		NotBefore: time.Now(),
-		// время жизни сертификата — 10 лет
-		NotAfter:     time.Now().AddDate(10, 0, 0),
-		SubjectKeyId: []byte{1, 2, 3, 4, 6},
-		// устанавливаем использование ключа для цифровой подписи,
-		// а также клиентской и серверной авторизации
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
-	}
-)
-
 // KeyPair holds the file paths for the certificate and private key.
 type KeyPair struct {
 	CertPEMFile       string
 	PrivateKeyPEMFile string
 }
 
-// GetSertKey checks if certificate and private key files exist in the specified path.
+// GetCertKey checks if certificate and private key files exist in the specified path.
 // If they do not exist, it generates new ones.
 // It returns the paths to the certificate and private key files.
-func GetSertKey(path string) (KeyPair, error) {
+func GetCertKey(path string) (KeyPair, error) {
 	certPath := filepath.Join(path, "cert.pem")
 	privateKeyPath := filepath.Join(path, "private.pem")
 
 	if !fileExists(certPath) || !fileExists(privateKeyPath) {
-		return genSertKey(path)
+		return genCertKey(path)
 	}
 
 	return KeyPair{
@@ -79,21 +56,21 @@ func fileExists(path string) bool {
 	return false
 }
 
-func genSertKey(path string) (KeyPair, error) {
+func genCertKey(path string) (KeyPair, error) {
 	// создаём шаблон сертификата
-
+	var cert = getCertTemplate()
 	// создаём новый приватный RSA-ключ длиной 4096 бит
 	// обратите внимание, что для генерации ключа и сертификата
 	// используется rand.Reader в качестве источника случайных данных
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	// создаём сертификат x.509
 	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	// кодируем сертификат и ключ в формате PEM, который
@@ -105,7 +82,7 @@ func genSertKey(path string) (KeyPair, error) {
 		Bytes: certBytes,
 	})
 	if err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	var privateKeyPEM bytes.Buffer
@@ -115,24 +92,47 @@ func genSertKey(path string) (KeyPair, error) {
 		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 	})
 	if err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	err = os.MkdirAll(path, 0750)
 	if err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	if err = os.WriteFile(filepath.Join(path, "cert.pem"), certPEM.Bytes(), 0600); err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	if err = os.WriteFile(filepath.Join(path, "private.pem"), privateKeyPEM.Bytes(), 0600); err != nil {
-		return KeyPair{}, fmt.Errorf("genSertKey: %w", err)
+		return KeyPair{}, fmt.Errorf("genCertKey: %w", err)
 	}
 
 	return KeyPair{
 		CertPEMFile:       filepath.Join(path, "cert.pem"),
 		PrivateKeyPEMFile: filepath.Join(path, "private.pem"),
 	}, nil
+}
+
+func getCertTemplate() *x509.Certificate {
+	return &x509.Certificate{
+		// указываем уникальный номер сертификата
+		SerialNumber: big.NewInt(1658),
+		// заполняем базовую информацию о владельце сертификата
+		Subject: pkix.Name{
+			Organization: []string{"Pavel.Budkov"},
+			Country:      []string{"RU"},
+		},
+		// разрешаем использование сертификата для 127.0.0.1 и ::1
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		// сертификат верен, начиная со времени создания
+		NotBefore: time.Now(),
+		// время жизни сертификата — 10 лет
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		// устанавливаем использование ключа для цифровой подписи,
+		// а также клиентской и серверной авторизации
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+	}
 }
