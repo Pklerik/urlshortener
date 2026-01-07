@@ -25,6 +25,6 @@ type LinkServicer interface {
 	ProvideUserLinks(ctx context.Context, userID model.UserID) ([]model.LinkData, error)
 	MarkAsDeleted(ctx context.Context, userID model.UserID, shortLinks model.ShortUrls) error
 	PingDB(ctx context.Context) error
-	GetSecret(name string) (any, bool)
+	GetSecret(name string) (string, bool)
 	GetStats(ctx context.Context) (model.Stats, error)
 }

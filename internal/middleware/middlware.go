@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Pklerik/urlshortener/internal/config"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"google.golang.org/grpc"
 )
@@ -191,25 +190,9 @@ func (c *compressReader) Close() error {
 }
 
 // TrustedSubnetMiddleware trusted subnet limiter.
-func TrustedSubnetMiddleware(parsedFlags config.StartupFlagsParser) func(http.Handler) http.Handler {
+func TrustedSubnetMiddleware(trustedIPNet *net.IPNet) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			v := parsedFlags.GetTrustedCIDR()
-			if v == "" {
-				logger.Sugar.Warn("no authorized IPs was provided")
-				http.Error(w, "Forbidden", http.StatusForbidden)
-
-				return
-			}
-
-			_, trustedIPNet, err := net.ParseCIDR(v)
-			if err != nil {
-				logger.Sugar.Errorf("unable to parse trusted CIDR: %w", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-
-				return
-			}
-
 			ip := net.ParseIP(r.Header.Get("X-Real-IP"))
 			if !trustedIPNet.Contains(ip) {
 				logger.Sugar.Warnf("unauthorized access attempt from IP: %s", ip)

@@ -3,13 +3,16 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
 	"github.com/Pklerik/urlshortener/internal/config"
 	grpcHandler "github.com/Pklerik/urlshortener/internal/handler/grpc/handler"
 	restHandler "github.com/Pklerik/urlshortener/internal/handler/rest"
+	"github.com/Pklerik/urlshortener/internal/interceptor"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/middleware"
 	"github.com/Pklerik/urlshortener/internal/repository"
@@ -23,6 +26,18 @@ import (
 
 	"golang.org/x/net/http2/h2c"
 )
+
+var (
+	ErrEmptyTrustedIPs       = errors.New("empty trusted IP list")
+	ErrUnableParseTrustedIPs = errors.New("unable to parse trusted IP list")
+)
+
+type Handlers struct {
+	AuthHandler  restHandler.IAuthentication
+	LinksHandler restHandler.LinkHandler
+	AuditHandler restHandler.Auditer
+	GRPCHandler  *grpc.Server
+}
 
 // ConfigureRouter starts server with base configuration.
 func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser) (http.Handler, error) {
@@ -41,13 +56,19 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 	linksService := links.NewLinksService(linksRepo, parsedFlags.GetSecretKey())
 
 	authHandler := restHandler.NewAuthenticationHandler(linksService)
-	linksHandler := restHandler.NewLinkHandler(linksService, authHandler, parsedFlags)
-	auditHandler := restHandler.NewAuditor(parsedFlags, authHandler)
-	gh, err := grpcHandler.NewUsersLinksHandler(ctx, linksService)
-	if err != nil {
-		return nil, fmt.Errorf("unable to start gRPC Server: %w", err)
+
+	hs := Handlers{
+		AuthHandler:  authHandler,
+		LinksHandler: restHandler.NewLinkHandler(linksService, authHandler, parsedFlags),
+		AuditHandler: restHandler.NewAuditor(parsedFlags, authHandler),
+		GRPCHandler:  grpcHandler.NewUsersLinksHandler(ctx, linksService).Register(interceptor.AuthUnaryServerInterceptor(parsedFlags.GetSecretKey())),
 	}
-	r = addRESTRoutes(r, parsedFlags, authHandler, auditHandler, linksHandler, gh)
+	trustedIPNet, err := parseTrustedCIDR(parsedFlags)
+	if err != nil {
+		return r, fmt.Errorf("ConfigureRouter: %w", err)
+	}
+
+	r = addRESTRoutes(r, parsedFlags, hs, trustedIPNet)
 
 	printRoutes(r)
 
@@ -56,9 +77,8 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 }
 
 func addRESTRoutes(r *chi.Mux, parsedFlags config.StartupFlagsParser,
-	authHandler *restHandler.AuthHandler, auditHandler *restHandler.Auditor,
-	linksHandler restHandler.LinkHandler, gh *grpc.Server) *chi.Mux {
-	r.Use(middleware.GRPCMuxMiddleware(gh))
+	hs Handlers, trustedIPNet *net.IPNet) *chi.Mux {
+	r.Use(middleware.GRPCMuxMiddleware(hs.GRPCHandler))
 	// Add pprof routes
 	r.Mount("/debug", chimiddleware.Profiler())
 
@@ -67,37 +87,37 @@ func addRESTRoutes(r *chi.Mux, parsedFlags config.StartupFlagsParser,
 			chimiddleware.RequestID,
 			chimiddleware.RealIP,
 			chimiddleware.Logger,
-			// chimiddleware.Recoverer,
+			chimiddleware.Recoverer,
 			middleware.GZIPMiddleware,
-			authHandler.AuthUser,
+			hs.AuthHandler.AuthUser,
 			chimiddleware.Timeout(parsedFlags.GetTimeout()),
 		)
 		r.Route("/", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
-				r.Use(auditHandler.AuditMiddleware)
-				r.Post("/", linksHandler.PostText)
-				r.Get("/{shortURL}", linksHandler.Get)
+				r.Use(hs.AuditHandler.AuditMiddleware)
+				r.Post("/", hs.LinksHandler.PostText)
+				r.Get("/{shortURL}", hs.LinksHandler.Get)
 			})
 			r.Route("/api", func(r chi.Router) {
 				r.Route("/shorten", func(r chi.Router) {
 					r.Group(func(r chi.Router) {
-						r.Use(auditHandler.AuditMiddleware)
-						r.Post("/", linksHandler.PostJSON)
+						r.Use(hs.AuditHandler.AuditMiddleware)
+						r.Post("/", hs.LinksHandler.PostJSON)
 					})
-					r.Post("/batch", linksHandler.PostBatchJSON)
+					r.Post("/batch", hs.LinksHandler.PostBatchJSON)
 				})
 				r.Route("/user", func(r chi.Router) {
-					r.Get("/urls", linksHandler.GetUserLinks)
-					r.Delete("/urls", linksHandler.DeleteUserLinks)
+					r.Get("/urls", hs.LinksHandler.GetUserLinks)
+					r.Delete("/urls", hs.LinksHandler.DeleteUserLinks)
 				})
 				r.Route("/internal", func(r chi.Router) {
 					r.Group(func(r chi.Router) {
-						r.Use(middleware.TrustedSubnetMiddleware(parsedFlags))
-						r.Get("/stats", linksHandler.GetStats)
+						r.Use(middleware.TrustedSubnetMiddleware(trustedIPNet))
+						r.Get("/stats", hs.LinksHandler.GetStats)
 					})
 				})
 			})
-			r.Get("/ping", linksHandler.PingDB)
+			r.Get("/ping", hs.LinksHandler.PingDB)
 		})
 	})
 
@@ -143,4 +163,21 @@ func chooseRepoRealization(ctx context.Context, parsedFlags config.StartupFlagsP
 
 		return inmemory.NewInMemoryLinksRepository(), nil
 	}
+}
+
+func parseTrustedCIDR(parsedFlags config.StartupFlagsParser) (*net.IPNet, error) {
+	v := parsedFlags.GetTrustedCIDR()
+	if v == "" {
+		logger.Sugar.Warn("no authorized IPs was provided")
+		return &net.IPNet{}, ErrEmptyTrustedIPs
+	}
+
+	_, trustedIPNet, err := net.ParseCIDR(v)
+	if err != nil {
+		logger.Sugar.Errorf("unable to parse trusted CIDR: %w", err)
+
+		return &net.IPNet{}, ErrUnableParseTrustedIPs
+	}
+	return trustedIPNet, nil
+
 }

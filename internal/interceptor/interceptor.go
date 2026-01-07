@@ -3,6 +3,7 @@ package interceptor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Pklerik/urlshortener/internal/logger"
@@ -10,6 +11,11 @@ import (
 	"github.com/samborkent/uuidv7"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+)
+
+var (
+	ErrEmptyMetadata = errors.New("empty metadata")
+	ErrSendingHeader = errors.New("unable to send header")
 )
 
 // AuthUnaryServerInterceptor - provide interceptor for authorization on gRPC requests.
@@ -34,19 +40,13 @@ func AuthUnaryServerInterceptor(secret string) func(ctx context.Context, req any
 }
 
 func authUser(ctx context.Context, secret string) (context.Context, error) {
+	var err error
 	// Получаем ID пользователя из контекста
-	var (
-		jwtToken string
-		err      error
-	)
+	headerName := "authorization"
 
-	md, ok := metadata.FromIncomingContext(ctx)
-	if ok {
-		values := md.Get("authorization")
-		if len(values) > 0 {
-			// ключ содержит слайс строк, получаем первую строку
-			jwtToken = values[0]
-		}
+	jwtToken, ok := jwtgenerator.ParseTokenFromCtxMetadata(ctx, headerName)
+	if !ok {
+		return ctx, fmt.Errorf("authUser: %w", err)
 	}
 
 	if jwtToken == "" {
@@ -56,15 +56,27 @@ func authUser(ctx context.Context, secret string) (context.Context, error) {
 		}
 	}
 
+	newCtx, err := updateAuthorizationToken(ctx, jwtToken, headerName)
+	if err != nil {
+		return ctx, fmt.Errorf("authUser: %w", err)
+	}
+
+	return newCtx, nil
+}
+
+func updateAuthorizationToken(ctx context.Context, jwtToken, headerName string) (context.Context, error) {
 	headerMd := metadata.Pairs(
-		"authorization", jwtToken,
+		headerName, jwtToken,
 	)
 	if err := grpc.SendHeader(ctx, headerMd); err != nil {
 		logger.Sugar.Warnf("could not send header: %v", err)
-		// Handle error appropriately
+		return ctx, ErrSendingHeader
 	}
-	md.Append("authorization", jwtToken)
-	newCtx := metadata.NewIncomingContext(ctx, md)
 
-	return newCtx, nil
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ctx, ErrEmptyMetadata
+	}
+	md.Append(headerName, jwtToken)
+	return metadata.NewIncomingContext(ctx, md), nil
 }

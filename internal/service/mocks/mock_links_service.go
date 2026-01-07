@@ -36,10 +36,10 @@ func (m *MockLinkServicer) EXPECT() *MockLinkServicerMockRecorder {
 }
 
 // GetSecret mocks base method.
-func (m *MockLinkServicer) GetSecret(name string) (any, bool) {
+func (m *MockLinkServicer) GetSecret(name string) (string, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSecret", name)
-	ret0, _ := ret[0].(any)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }

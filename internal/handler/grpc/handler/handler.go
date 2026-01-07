@@ -7,21 +7,21 @@ import (
 	"fmt"
 
 	pb "github.com/Pklerik/urlshortener/api/proto"
-	"github.com/Pklerik/urlshortener/internal/interceptor"
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/model"
 	"github.com/Pklerik/urlshortener/internal/repository"
 	"github.com/Pklerik/urlshortener/internal/service"
 	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
-	"github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
 	// ErrUnauthorizedUser - error for unauthorized user.
 	ErrUnauthorizedUser = errors.New("unauthorized user")
+	// ErrEmptyToken unable to parse token.
+	ErrEmptyToken = errors.New("unable to parse token")
 )
 
 // UsersLinksHandler поддерживает все необходимые методы сервера.
@@ -38,48 +38,39 @@ type UsersLinksHandler struct {
 var _ pb.ShortenerServiceServer = (*UsersLinksHandler)(nil)
 
 // NewUsersLinksHandler - provide gRPC Handlers for Links Service.
-func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) (*grpc.Server, error) {
-	ulh := &UsersLinksHandler{service: svc}
+func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) *UsersLinksHandler {
+	return &UsersLinksHandler{service: svc}
 
-	secret, ok := svc.GetSecret("SECRET_KEY")
-	if !ok {
-		return nil, service.ErrEmptySecret
-	}
+}
 
-	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor.AuthUnaryServerInterceptor(secret.(string))))
+func (ulh *UsersLinksHandler) Register(interceptors ...grpc.UnaryServerInterceptor) *grpc.Server {
+	s := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			interceptors...))
 	pb.RegisterShortenerServiceServer(s, ulh)
 
-	return s, nil
+	return s
 }
 
 // GetUserID return userID provided from JWT token form context.
 func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error) {
 	// Получаем ID пользователя из контекста
 	var (
-		jwtToken string
-		userID   model.UserID
-		err      error
+		userID model.UserID
+		err    error
 	)
 
-	md, ok := metadata.FromIncomingContext(ctx)
+	jwtToken, ok := jwtgenerator.ParseTokenFromCtxMetadata(ctx, "authorization")
 	if !ok {
-		return userID, ErrUnauthorizedUser
+		return userID, ErrEmptyToken
 	}
-
-	values := md.Get("authorization")
-	if len(values) == 0 {
-		logger.Sugar.Warnf("unable to authorized user")
-		return userID, ErrUnauthorizedUser
-	}
-	// ключ содержит слайс строк, получаем первую строку
-	jwtToken = values[0]
 
 	secret, ok := us.service.GetSecret("SECRET_KEY")
 	if !ok {
 		return userID, service.ErrEmptySecret
 	}
 
-	userIDUUID, err := jwtgenerator.GetUserID(secret.(string), jwtToken)
+	userIDUUID, err := jwtgenerator.GetUserID(secret, jwtToken)
 	if err != nil {
 		return userID, fmt.Errorf("unexpected JWT parsing error: %w", err)
 	}

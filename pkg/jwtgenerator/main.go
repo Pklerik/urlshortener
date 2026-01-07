@@ -2,6 +2,7 @@
 package jwtgenerator
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/samborkent/uuidv7"
+	"google.golang.org/grpc/metadata"
 )
 
 var (
@@ -80,4 +82,23 @@ func GetUserID(secretKey string, jwtToken string) (uuidv7.UUID, error) {
 	}
 
 	return claims.UserID, nil
+}
+
+// ParseTokenFromCtxMetadata - proide string token from ctx metadata gRPC for first item in headerName.
+func ParseTokenFromCtxMetadata(ctx context.Context, headerName string) (string, bool) {
+	var (
+		jwtToken string
+		isValid  bool
+	)
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		values := md.Get(headerName)
+		if len(values) > 0 {
+			// ключ содержит слайс строк, получаем первую строку
+			jwtToken = values[0]
+			isValid = true
+		}
+	}
+	return jwtToken, isValid
 }

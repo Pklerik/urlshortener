@@ -6,41 +6,37 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"testing"
 
 	pb "github.com/Pklerik/urlshortener/api/proto"
+	"github.com/Pklerik/urlshortener/internal/logger"
 	"github.com/Pklerik/urlshortener/internal/repository/inmemory"
 	"github.com/Pklerik/urlshortener/internal/service/links"
-	"github.com/gogo/protobuf/proto"
-	"golang.org/x/net/http2/h2c"
+	"github.com/Pklerik/urlshortener/pkg/jwtgenerator"
+	"github.com/samborkent/uuidv7"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 func Test_Handler(t *testing.T) {
+	// initialize logger used by service
+	_ = logger.Initialize("debug")
 	port := ":50505"
 	ctx := context.Background()
 
-	var (
-		cancel context.CancelFunc
-		err    error
-	)
+	cancel, err := StartSever(ctx, port)
 	defer cancel()
-	g, _ := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		cancel, err = StartSever(ctx, port)
-		return err
-	},
-	)
 
 	// Устанавливаем соединение с сервером
-	conn, err := grpc.NewClient(port, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr := "127.0.0.1" + port
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("ошибка при установлении соединения с сервером", "error", err)
 		t.Error("Error running grpc client")
@@ -53,16 +49,24 @@ func Test_Handler(t *testing.T) {
 		slog.Error("ошибка при работе клиента", "error", err)
 		t.Error("Error running grpc client")
 	}
+
+	cancel()
 }
 
 func SendUsersRequests(ctx context.Context, c pb.ShortenerServiceClient) error {
-
 	b := make([]byte, 20)
 	_, _ = rand.Read(b)
 
-	link := "https://example.com/some/very/long/url" + string(b)
+	link := "https://example.com/some/very/long/url" + fmt.Sprintf("%x", b)
 
-	header := metadata.New(map[string]string{})
+	// build jwt token and attach to metadata
+	uid := uuidv7.New()
+	token, err := jwtgenerator.BuildJWTString(uid, "secret_key")
+	if err != nil {
+		return err
+	}
+
+	header := metadata.New(map[string]string{"authorization": token})
 	ctx = metadata.NewOutgoingContext(ctx, header)
 	// Отправляем запрос на сокращение URL
 	shortenResp, err := c.ShortenURL(ctx, pb.URLShortenRequest_builder{Url: proto.String(link)}.Build())
@@ -91,33 +95,27 @@ func StartSever(ctx context.Context, port string) (context.CancelFunc, error) {
 	}()
 
 	linksRepo := inmemory.NewInMemoryLinksRepository()
-	linksService := links.NewLinksService(linksRepo, "secret_key")
-	ulh, err := NewUsersLinksHandler(ctx, linksService)
-	if err != nil {
-		return cancel, fmt.Errorf("Unexpected error: %w", err)
-	}
 
-	httpServer := &http.Server{
-		Addr:    port,
-		Handler: h2c.NewHandler(ulh, nil),
+	linksService := links.NewLinksService(linksRepo, "secret_key")
+	uhlService := NewUsersLinksHandler(ctx, linksService).Register()
+
+	lis, err := net.Listen("tcp", "127.0.0.1"+port)
+	if err != nil {
+		log.Println("failed to listen:", err)
+		cancel()
+		return cancel, err
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		log.Println("Starting server")
-
-		return httpServer.ListenAndServe()
+		log.Println("Starting gRPC server")
+		return uhlService.Serve(lis)
 	})
 	g.Go(func() error {
 		<-gCtx.Done()
 		log.Println("Stopped serving new connections.")
-
-		return httpServer.Shutdown(context.Background())
+		return lis.Close()
 	})
-
-	if err := g.Wait(); err != nil {
-		log.Printf("exit reason: %s \n", err)
-	}
 	return cancel, nil
 
 }
