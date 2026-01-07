@@ -28,11 +28,13 @@ import (
 )
 
 var (
-	ErrEmptyTrustedIPs       = errors.New("empty trusted IP list")
+	// ErrEmptyTrustedIPs empty trusted IP list.
+	ErrEmptyTrustedIPs = errors.New("empty trusted IP list")
+	// ErrUnableParseTrustedIPs unable to parse trusted IP list.
 	ErrUnableParseTrustedIPs = errors.New("unable to parse trusted IP list")
 )
 
-type Handlers struct {
+type handlers struct {
 	AuthHandler  restHandler.IAuthentication
 	LinksHandler restHandler.LinkHandler
 	AuditHandler restHandler.Auditer
@@ -57,12 +59,13 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 
 	authHandler := restHandler.NewAuthenticationHandler(linksService)
 
-	hs := Handlers{
+	hs := handlers{
 		AuthHandler:  authHandler,
 		LinksHandler: restHandler.NewLinkHandler(linksService, authHandler, parsedFlags),
 		AuditHandler: restHandler.NewAuditor(parsedFlags, authHandler),
 		GRPCHandler:  grpcHandler.NewUsersLinksHandler(ctx, linksService).Register(interceptor.AuthUnaryServerInterceptor(parsedFlags.GetSecretKey())),
 	}
+
 	trustedIPNet, err := parseTrustedCIDR(parsedFlags)
 	if err != nil {
 		return r, fmt.Errorf("ConfigureRouter: %w", err)
@@ -77,7 +80,7 @@ func ConfigureRouter(ctx context.Context, parsedFlags config.StartupFlagsParser)
 }
 
 func addRESTRoutes(r *chi.Mux, parsedFlags config.StartupFlagsParser,
-	hs Handlers, trustedIPNet *net.IPNet) *chi.Mux {
+	hs handlers, trustedIPNet *net.IPNet) *chi.Mux {
 	r.Use(middleware.GRPCMuxMiddleware(hs.GRPCHandler))
 	// Add pprof routes
 	r.Mount("/debug", chimiddleware.Profiler())
@@ -178,6 +181,6 @@ func parseTrustedCIDR(parsedFlags config.StartupFlagsParser) (*net.IPNet, error)
 
 		return &net.IPNet{}, ErrUnableParseTrustedIPs
 	}
-	return trustedIPNet, nil
 
+	return trustedIPNet, nil
 }

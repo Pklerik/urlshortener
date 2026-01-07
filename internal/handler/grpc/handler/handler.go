@@ -40,9 +40,9 @@ var _ pb.ShortenerServiceServer = (*UsersLinksHandler)(nil)
 // NewUsersLinksHandler - provide gRPC Handlers for Links Service.
 func NewUsersLinksHandler(_ context.Context, svc service.LinkServicer) *UsersLinksHandler {
 	return &UsersLinksHandler{service: svc}
-
 }
 
+// Register provide functionality for registering GRPC server with provided interceptors.
 func (ulh *UsersLinksHandler) Register(interceptors ...grpc.UnaryServerInterceptor) *grpc.Server {
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -53,7 +53,7 @@ func (ulh *UsersLinksHandler) Register(interceptors ...grpc.UnaryServerIntercept
 }
 
 // GetUserID return userID provided from JWT token form context.
-func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error) {
+func (ulh *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error) {
 	// Получаем ID пользователя из контекста
 	var (
 		userID model.UserID
@@ -65,7 +65,7 @@ func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error
 		return userID, ErrEmptyToken
 	}
 
-	secret, ok := us.service.GetSecret("SECRET_KEY")
+	secret, ok := ulh.service.GetSecret("SECRET_KEY")
 	if !ok {
 		return userID, service.ErrEmptySecret
 	}
@@ -81,8 +81,8 @@ func (us *UsersLinksHandler) GetUserID(ctx context.Context) (model.UserID, error
 // Здесь будут реализованы методы сервера
 
 // ExpandURL реализует метод получения URL по короткой ссылке.
-func (us *UsersLinksHandler) ExpandURL(ctx context.Context, req *pb.URLExpandRequest) (*pb.URLExpandResponse, error) {
-	link, err := us.service.GetShort(ctx, req.GetId())
+func (ulh *UsersLinksHandler) ExpandURL(ctx context.Context, req *pb.URLExpandRequest) (*pb.URLExpandResponse, error) {
+	link, err := ulh.service.GetShort(ctx, req.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("ExpandURL: %w", err)
 	}
@@ -95,14 +95,14 @@ func (us *UsersLinksHandler) ExpandURL(ctx context.Context, req *pb.URLExpandReq
 }
 
 // ShortenURL реализует метод сокращения URL.
-func (us *UsersLinksHandler) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb.URLShortenResponse, error) {
+func (ulh *UsersLinksHandler) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb.URLShortenResponse, error) {
 	// Реализация метода ShortenURL
-	userID, err := us.GetUserID(ctx)
+	userID, err := ulh.GetUserID(ctx)
 	if err != nil {
 		return &pb.URLShortenResponse{}, fmt.Errorf("ShortenURL: %w", err)
 	}
 
-	links, err := us.service.RegisterLinks(ctx, []string{req.GetUrl()}, userID)
+	links, err := ulh.service.RegisterLinks(ctx, []string{req.GetUrl()}, userID)
 	if err != nil && !errors.Is(err, repository.ErrExistingLink) {
 		logger.Sugar.Errorf("grpc ShortenURL error: %v", err)
 		return nil, fmt.Errorf("ShortenURL: %w", err)
@@ -120,14 +120,14 @@ func (us *UsersLinksHandler) ShortenURL(ctx context.Context, req *pb.URLShortenR
 }
 
 // ListUserURLs provide service statistics.
-func (us *UsersLinksHandler) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*pb.UserURLsResponse, error) {
+func (ulh *UsersLinksHandler) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*pb.UserURLsResponse, error) {
 	// Реализация метода ListUserURLs
-	userID, err := us.GetUserID(ctx)
+	userID, err := ulh.GetUserID(ctx)
 	if err != nil {
 		return &pb.UserURLsResponse{}, fmt.Errorf("ListUserURLs: %w", err)
 	}
 
-	links, err := us.service.ProvideUserLinks(ctx, userID)
+	links, err := ulh.service.ProvideUserLinks(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("ListUserURLs: %w", err)
 	}

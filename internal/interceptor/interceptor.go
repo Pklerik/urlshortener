@@ -77,6 +77,8 @@ func updateAuthorizationToken(ctx context.Context, jwtToken, headerName string) 
 	if !ok {
 		return ctx, ErrEmptyMetadata
 	}
+
 	md.Append(headerName, jwtToken)
+
 	return metadata.NewIncomingContext(ctx, md), nil
 }

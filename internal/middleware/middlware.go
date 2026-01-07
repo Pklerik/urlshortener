@@ -221,5 +221,6 @@ func GRPCMuxMiddleware(grpcServer *grpc.Server) func(next http.Handler) http.Han
 			next.ServeHTTP(w, r)
 		})
 	}
+
 	return fn
 }

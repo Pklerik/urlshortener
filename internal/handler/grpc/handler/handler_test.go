@@ -32,11 +32,17 @@ func Test_Handler(t *testing.T) {
 	ctx := context.Background()
 
 	cancel, err := StartSever(ctx, port)
+	if err != nil {
+		cancel()
+		slog.Error("ошибка при запуске сервера", "error", err)
+		t.Error("Error running grpc server")
+		return
+	}
 	defer cancel()
 
 	// Устанавливаем соединение с сервером
 	addr := "127.0.0.1" + port
-	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("ошибка при установлении соединения с сервером", "error", err)
 		t.Error("Error running grpc client")

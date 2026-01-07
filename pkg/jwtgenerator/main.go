@@ -100,5 +100,6 @@ func ParseTokenFromCtxMetadata(ctx context.Context, headerName string) (string, 
 			isValid = true
 		}
 	}
+
 	return jwtToken, isValid
 }
