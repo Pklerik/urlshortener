@@ -14,7 +14,9 @@ import (
 )
 
 var (
+	// ErrEmptyMetadata empty metadata.
 	ErrEmptyMetadata = errors.New("empty metadata")
+	// ErrSendingHeader unable to send header.
 	ErrSendingHeader = errors.New("unable to send header")
 )
 
